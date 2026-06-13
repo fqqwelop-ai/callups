@@ -2,64 +2,87 @@ const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle,
   ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder, Events } = require('discord.js');
 const { Client: DBClient, Request } = require('../shared/models');
 
-// خزن كل البوتات النشطة
-const activeBots = new Map(); // guildId -> Discord Client
+const activeBots = new Map();
 
-// ===== تشغيل بوت لعميل معين =====
 async function startBot(clientData) {
   const guildId = clientData.guildId;
-
-  // إذا البوت شغال، وقفه أول
-  if (activeBots.has(guildId)) {
-    await stopBot(guildId);
-  }
+  if (activeBots.has(guildId)) await stopBot(guildId);
 
   const bot = new Client({
     intents: [
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMembers,
       GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.GuildVoiceStates,
     ]
   });
 
   bot.once(Events.ClientReady, async (readyClient) => {
     console.log(`✅ Bot ready for guild: ${guildId} | Tag: ${readyClient.user.tag}`);
-    
-    // تحديث اسم السيرفر في DB
     const guild = readyClient.guilds.cache.get(guildId);
-    if (guild) {
-      await DBClient.findOneAndUpdate({ guildId }, { guildName: guild.name });
+    if (guild) await DBClient.findOneAndUpdate({ guildId }, { guildName: guild.name });
+  });
+
+  // مراقبة دخول الروم (Voice State)
+  bot.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+    try {
+      if (oldState.guildId !== guildId) return;
+      const db = await DBClient.findOne({ guildId });
+      if (!db?.settings?.watchChannelId) return;
+      if (newState.channelId !== db.settings.watchChannelId) return;
+
+      // شخص دخل الروم المحدد
+      const userId = newState.member.id;
+      const pendingRequests = await Request.find({ guildId, targetUserId: userId, status: 'pending' });
+      if (!pendingRequests.length) return;
+
+      for (const req of pendingRequests) {
+        // أرسل رسالة للمستدعي
+        if (db.settings.dmToSubmitterOnJoin) {
+          try {
+            const submitter = await bot.users.fetch(req.submitterId);
+            const msg = (db.settings.dmToSubmitterMessage || 'دخل {target} الروم المحدد!')
+              .replace('{target}', `<@${userId}>`)
+              .replace('{server}', db.guildName);
+            await submitter.send(`📢 **إشعار كول-آب:** ${msg}`);
+          } catch {}
+        }
+      }
+    } catch (err) {
+      console.error('VoiceState error:', err.message);
     }
   });
 
-  // ===== معالجة الأزرار =====
   bot.on(Events.InteractionCreate, async (interaction) => {
     try {
-      // زر فتح الفورم
-      if (interaction.isButton() && interaction.customId === `coopup_open_${guildId}`) {
-        await handleOpenForm(interaction, clientData);
-      }
+      const db = await DBClient.findOne({ guildId });
+      if (!db) return;
 
-      // تأكيد الطلب من الموديريتور
-      if (interaction.isButton() && interaction.customId.startsWith(`coopup_approve_`)) {
-        await handleApprove(interaction, clientData);
+      if (interaction.isButton() && interaction.customId === `callup_open_${guildId}`) {
+        await handleOpenForm(interaction, db);
       }
-
-      // رفض الطلب
-      if (interaction.isButton() && interaction.customId.startsWith(`coopup_reject_`)) {
-        await handleReject(interaction, clientData);
+      if (interaction.isButton() && interaction.customId.startsWith(`callup_approve_`)) {
+        await handleApprove(interaction, db);
       }
-
-      // استقبال الفورم المرسل
-      if (interaction.isModalSubmit() && interaction.customId === `coopup_modal_${guildId}`) {
-        await handleModalSubmit(interaction, clientData);
+      if (interaction.isButton() && interaction.customId.startsWith(`callup_reject_`)) {
+        await handleReject(interaction, db);
       }
-
+      if (interaction.isButton() && interaction.customId.startsWith(`callup_remind_person_`)) {
+        await handleRemindPerson(interaction, db);
+      }
+      if (interaction.isButton() && interaction.customId.startsWith(`callup_remind_admin_`)) {
+        await handleRemindAdmin(interaction, db);
+      }
+      if (interaction.isModalSubmit() && interaction.customId === `callup_modal_${guildId}`) {
+        await handleModalSubmit(interaction, db);
+      }
     } catch (err) {
-      console.error(`Bot error [${guildId}]:`, err);
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: '❌ صار خطأ، حاول مرة ثانية.', ephemeral: true });
-      }
+      console.error(`Bot error [${guildId}]:`, err.message);
+      try {
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: '❌ صار خطأ، حاول مرة ثانية.', ephemeral: true });
+        }
+      } catch {}
     }
   });
 
@@ -68,349 +91,298 @@ async function startBot(clientData) {
     activeBots.set(guildId, bot);
     return { success: true };
   } catch (err) {
-    console.error(`Failed to start bot for ${guildId}:`, err.message);
     return { success: false, error: err.message };
   }
 }
 
-// ===== إيقاف البوت =====
 async function stopBot(guildId) {
   if (activeBots.has(guildId)) {
-    const bot = activeBots.get(guildId);
-    bot.destroy();
+    activeBots.get(guildId).destroy();
     activeBots.delete(guildId);
-    console.log(`🛑 Bot stopped for guild: ${guildId}`);
   }
 }
 
-// ===== نشر الإمبيد في الروم =====
 async function deployEmbed(guildId) {
   const bot = activeBots.get(guildId);
   if (!bot) return { success: false, error: 'البوت مو شغال' };
 
-  const clientData = await DBClient.findOne({ guildId });
-  if (!clientData) return { success: false, error: 'العميل مو موجود' };
-
-  const { settings } = clientData;
-  if (!settings.embedChannelId) return { success: false, error: 'ما تم تحديد الروم' };
+  const db = await DBClient.findOne({ guildId });
+  if (!db?.settings?.embedChannelId) return { success: false, error: 'ما تم تحديد الروم' };
 
   try {
     const guild = bot.guilds.cache.get(guildId);
-    if (!guild) return { success: false, error: 'البوت مو في السيرفر' };
-
-    const channel = guild.channels.cache.get(settings.embedChannelId);
+    const channel = guild?.channels.cache.get(db.settings.embedChannelId);
     if (!channel) return { success: false, error: 'الروم مو موجود' };
 
     const embed = new EmbedBuilder()
-      .setTitle(settings.embedTitle || '🛡️ طلب كوب-آب')
-      .setDescription(settings.embedDescription || 'اضغط الزر أدناه لتقديم طلب كوب-آب')
-      .setColor(settings.embedColor || '#5865F2')
-      .setTimestamp()
-      .setFooter({ text: 'نظام الكوب-آب' });
+      .setTitle(db.settings.embedTitle || '📞 استدعاء')
+      .setDescription(db.settings.embedDescription || 'اضغط الزر أدناه للاستدعاء')
+      .setColor(db.settings.embedColor || '#5865F2')
+      .setTimestamp();
 
-    const buttonStyle = {
-      'Primary': ButtonStyle.Primary,
-      'Secondary': ButtonStyle.Secondary,
-      'Success': ButtonStyle.Success,
-      'Danger': ButtonStyle.Danger,
-    }[settings.buttonColor] || ButtonStyle.Primary;
+    const btnStyle = {
+      'Primary': ButtonStyle.Primary, 'Secondary': ButtonStyle.Secondary,
+      'Success': ButtonStyle.Success, 'Danger': ButtonStyle.Danger,
+    }[db.settings.buttonColor] || ButtonStyle.Primary;
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId(`coopup_open_${guildId}`)
-        .setLabel(settings.buttonLabel || '📋 تقديم طلب')
-        .setStyle(buttonStyle)
+        .setCustomId(`callup_open_${guildId}`)
+        .setLabel(db.settings.buttonLabel || '📋 تقديم استدعاء')
+        .setStyle(btnStyle)
     );
 
-    // حذف الإمبيد القديم إذا موجود
-    if (settings.embedMessageId) {
+    if (db.settings.embedMessageId) {
       try {
-        const oldMsg = await channel.messages.fetch(settings.embedMessageId);
-        await oldMsg.delete();
+        const old = await channel.messages.fetch(db.settings.embedMessageId);
+        await old.delete();
       } catch {}
     }
 
     const msg = await channel.send({ embeds: [embed], components: [row] });
-
-    // حفظ ID الرسالة
-    await DBClient.findOneAndUpdate(
-      { guildId },
-      { 'settings.embedMessageId': msg.id }
-    );
-
-    return { success: true, messageId: msg.id };
+    await DBClient.findOneAndUpdate({ guildId }, { 'settings.embedMessageId': msg.id });
+    return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
   }
 }
 
-// ===== فتح الفورم =====
-async function handleOpenForm(interaction, clientData) {
-  const { settings, guildId } = clientData;
-
+async function handleOpenForm(interaction, db) {
+  const { settings, guildId } = db;
   const modal = new ModalBuilder()
-    .setCustomId(`coopup_modal_${guildId}`)
-    .setTitle('📋 طلب كوب-آب');
+    .setCustomId(`callup_modal_${guildId}`)
+    .setTitle('📞 تقديم استدعاء');
 
-  const components = [];
+  const components = [
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('target_user_id')
+        .setLabel('كوبي آيدي الشخص المستدعى')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('123456789012345678')
+        .setRequired(true)
+    )
+  ];
 
-  // آيدي الشخص (ثابت دايماً)
-  if (settings.formFields?.userId !== false) {
-    components.push(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('target_user_id')
-          .setLabel('كوبي آيدي الشخص المستهدف')
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder('مثال: 123456789012345678')
-          .setRequired(true)
-      )
-    );
-  }
-
-  // السبب
   if (settings.formFields?.reason !== false) {
-    components.push(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('reason')
-          .setLabel('السبب')
-          .setStyle(TextInputStyle.Paragraph)
-          .setPlaceholder('اكتب السبب هنا...')
-          .setRequired(true)
-      )
-    );
+    components.push(new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('reason')
+        .setLabel(settings.logLabels?.reason || 'السبب')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true)
+    ));
   }
 
-  // الدليل
   if (settings.formFields?.evidence !== false) {
-    components.push(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('evidence')
-          .setLabel('الدليل (رابط)')
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder('https://...')
-          .setRequired(false)
-      )
-    );
+    components.push(new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('evidence')
+        .setLabel(settings.logLabels?.evidence || 'الدليل (رابط)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+    ));
   }
 
-  // حقل مخصص 1
+  if (settings.formFields?.deadline !== false) {
+    components.push(new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('deadline')
+        .setLabel('الموعد النهائي')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder(`مثال: بعد 24 ساعة أو يبدأ عند دخول الروم`)
+        .setRequired(false)
+    ));
+  }
+
   if (settings.formFields?.customField1) {
-    components.push(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('custom_field_1')
-          .setLabel(settings.formFields.customField1)
-          .setStyle(TextInputStyle.Short)
-          .setRequired(false)
-      )
-    );
+    components.push(new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('custom1')
+        .setLabel(settings.formFields.customField1)
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+    ));
   }
 
-  // حقل مخصص 2
-  if (settings.formFields?.customField2) {
-    components.push(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('custom_field_2')
-          .setLabel(settings.formFields.customField2)
-          .setStyle(TextInputStyle.Short)
-          .setRequired(false)
-      )
-    );
-  }
-
-  modal.addComponents(...components);
+  modal.addComponents(...components.slice(0, 5));
   await interaction.showModal(modal);
 }
 
-// ===== معالجة إرسال الفورم =====
-async function handleModalSubmit(interaction, clientData) {
-  const { settings, guildId } = clientData;
-
+async function handleModalSubmit(interaction, db) {
+  const { settings, guildId } = db;
   await interaction.deferReply({ ephemeral: true });
 
   const targetUserId = interaction.fields.getTextInputValue('target_user_id')?.trim();
-  const reason = interaction.fields.getTextInputValue('reason')?.trim();
-  const evidence = interaction.fields.getTextInputValue('evidence')?.trim() || null;
-  const customField1 = settings.formFields?.customField1 
-    ? interaction.fields.getTextInputValue('custom_field_1')?.trim() 
-    : null;
-  const customField2 = settings.formFields?.customField2
-    ? interaction.fields.getTextInputValue('custom_field_2')?.trim()
-    : null;
+  const reason = interaction.fields.getTextInputValue('reason')?.trim() || '-';
+  const evidence = interaction.fields.fields.has('evidence') ? interaction.fields.getTextInputValue('evidence')?.trim() : null;
+  const deadline = interaction.fields.fields.has('deadline') ? interaction.fields.getTextInputValue('deadline')?.trim() : null;
+  const custom1 = interaction.fields.fields.has('custom1') ? interaction.fields.getTextInputValue('custom1')?.trim() : null;
 
-  // تحقق من صحة الآيدي
   if (!/^\d{17,20}$/.test(targetUserId)) {
-    return interaction.editReply({ content: '❌ آيدي الشخص غير صحيح! يجب أن يكون رقماً فقط.' });
+    return interaction.editReply({ content: '❌ آيدي الشخص غير صحيح!' });
   }
 
-  // حفظ الطلب في DB
+  // جلب معلومات المستدعى
+  let targetMember = null;
+  let targetTag = targetUserId;
+  try {
+    targetMember = await interaction.guild.members.fetch(targetUserId);
+    targetTag = targetMember.user.tag;
+  } catch {}
+
   const request = new Request({
-    guildId,
-    submitterId: interaction.user.id,
-    submitterTag: interaction.user.tag,
-    targetUserId,
-    reason,
-    evidence,
-    customField1,
-    customField2,
+    guildId, submitterId: interaction.user.id, submitterTag: interaction.user.tag,
+    targetUserId, targetTag, reason, evidence, deadline, customField1: custom1,
   });
   await request.save();
 
-  // إرسال إلى روم الطلبات
-  if (settings.formSubmitChannelId) {
-    const submitChannel = interaction.guild.channels.cache.get(settings.formSubmitChannelId);
-    if (submitChannel) {
-      const requestEmbed = new EmbedBuilder()
-        .setTitle('📬 طلب كوب-آب جديد')
-        .setColor('#FFA500')
-        .addFields(
-          { name: '👤 مقدم الطلب', value: `<@${interaction.user.id}> (${interaction.user.id})`, inline: true },
-          { name: '🎯 الشخص المستهدف', value: `<@${targetUserId}> (${targetUserId})`, inline: true },
-          { name: '📝 السبب', value: reason },
-        )
+  // إرسال DM للمستدعى
+  if (settings.dmToTarget && targetMember) {
+    try {
+      const dmMsg = (settings.dmToTargetMessage || 'تم استدعاؤك في {server}. السبب: {reason}')
+        .replace('{server}', db.guildName)
+        .replace('{reason}', reason)
+        .replace('{submitter}', interaction.user.tag);
+      await targetMember.send(`📢 **استدعاء:** ${dmMsg}`);
+    } catch {}
+  }
+
+  // إرسال للوق
+  if (settings.logChannelId) {
+    const logChannel = interaction.guild.channels.cache.get(settings.logChannelId);
+    if (logChannel) {
+      const labels = settings.logLabels || {};
+      const logFields = settings.logFields || {};
+
+      const embed = new EmbedBuilder()
+        .setTitle('📞 تم تنفيذ الكول آب')
+        .setColor(settings.embedColor || '#5865F2')
         .setTimestamp()
-        .setFooter({ text: `طلب #${request._id}` });
+        .setFooter({ text: `ID: ${targetUserId}` });
 
-      if (evidence) requestEmbed.addFields({ name: '🔗 الدليل', value: evidence });
-      if (customField1 && settings.formFields?.customField1) {
-        requestEmbed.addFields({ name: settings.formFields.customField1, value: customField1 });
+      if (logFields.showSubmitter !== false) {
+        embed.addFields({ name: labels.submitter || 'تنفذ بواسطة', value: `<@${interaction.user.id}>`, inline: true });
       }
-      if (customField2 && settings.formFields?.customField2) {
-        requestEmbed.addFields({ name: settings.formFields.customField2, value: customField2 });
+      if (logFields.showTarget !== false) {
+        embed.addFields({ name: labels.target || 'المستدعى', value: `<@${targetUserId}>`, inline: true });
+      }
+      if (logFields.showReason !== false) {
+        embed.addFields({ name: labels.reason || 'السبب', value: reason });
+      }
+      if (evidence && logFields.showEvidence !== false) {
+        embed.addFields({ name: labels.evidence || 'الدليل', value: evidence });
+      }
+      if (deadline && logFields.showDeadline !== false) {
+        embed.addFields({ name: labels.deadline || 'الموعد النهائي', value: deadline });
+      }
+      if (logFields.showRoleChange !== false) {
+        const removeRole = settings.roleToRemove ? `إزالة <@&${settings.roleToRemove}>` : '-';
+        const addRole = settings.roleToAdd ? `إضافة <@&${settings.roleToAdd}>` : '-';
+        embed.addFields({ name: labels.roleChange || 'التغيير', value: `${removeRole}\n${addRole}` });
+      }
+      if (custom1 && settings.formFields?.customField1) {
+        embed.addFields({ name: settings.formFields.customField1, value: custom1 });
       }
 
-      const actionRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`coopup_approve_${request._id}`)
-          .setLabel('✅ موافقة')
-          .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-          .setCustomId(`coopup_reject_${request._id}`)
-          .setLabel('❌ رفض')
-          .setStyle(ButtonStyle.Danger),
+      // إضافة صورة المستدعى إن وجدت
+      if (targetMember?.user?.displayAvatarURL) {
+        embed.setThumbnail(targetMember.user.displayAvatarURL());
+      }
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`callup_remind_person_${request._id}`).setLabel('تذكير الشخص').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`callup_remind_admin_${request._id}`).setLabel('تذكير الإداري').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`callup_approve_${request._id}`).setLabel('إرجاع الرتبة').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`callup_reject_${request._id}`).setLabel('إرجاع بدون رتبة').setStyle(ButtonStyle.Danger),
       );
 
-      await submitChannel.send({ embeds: [requestEmbed], components: [actionRow] });
+      await logChannel.send({ embeds: [embed], components: [row] });
     }
   }
 
-  await interaction.editReply({ content: '✅ تم إرسال طلبك بنجاح! سيتم مراجعته قريباً.' });
+  // تغيير الرتبة تلقائياً
+  if (targetMember) {
+    try {
+      if (settings.roleToRemove) await targetMember.roles.remove(settings.roleToRemove).catch(() => {});
+      if (settings.roleToAdd) await targetMember.roles.add(settings.roleToAdd).catch(() => {});
+    } catch {}
+  }
+
+  await interaction.editReply({ content: '✅ تم تقديم الاستدعاء بنجاح!' });
 }
 
-// ===== الموافقة على الطلب =====
-async function handleApprove(interaction, clientData) {
-  const { settings, guildId } = clientData;
-  const requestId = interaction.customId.replace('coopup_approve_', '');
-
+async function handleApprove(interaction, db) {
+  const requestId = interaction.customId.replace('callup_approve_', '');
   await interaction.deferUpdate();
 
   const request = await Request.findById(requestId);
-  if (!request || request.status !== 'pending') {
-    return interaction.followUp({ content: '❌ هذا الطلب تمت معالجته مسبقاً.', ephemeral: true });
+  if (!request) return;
+
+  const guild = interaction.guild;
+  const member = await guild.members.fetch(request.targetUserId).catch(() => null);
+
+  if (member) {
+    if (db.settings.roleToAdd) await member.roles.remove(db.settings.roleToAdd).catch(() => {});
+    if (db.settings.roleToRemove) await member.roles.add(db.settings.roleToRemove).catch(() => {});
   }
 
-  try {
-    const guild = interaction.guild;
-    const member = await guild.members.fetch(request.targetUserId).catch(() => null);
-
-    if (!member) {
-      return interaction.followUp({ content: '❌ العضو مو موجود في السيرفر.', ephemeral: true });
-    }
-
-    // شيل الرتبة القديمة وأعطيه رتبة جديدة
-    if (settings.roleToRemove && member.roles.cache.has(settings.roleToRemove)) {
-      await member.roles.remove(settings.roleToRemove);
-    }
-    if (settings.roleToAdd) {
-      await member.roles.add(settings.roleToAdd);
-    }
-
-    // تحديث الطلب
-    await Request.findByIdAndUpdate(requestId, {
-      status: 'approved',
-      reviewerId: interaction.user.id,
-      reviewerTag: interaction.user.tag,
-      reviewedAt: new Date(),
-    });
-
-    // تعطيل الأزرار
-    const disabledRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`done_approve`).setLabel('✅ تم الموافقة').setStyle(ButtonStyle.Success).setDisabled(true),
-      new ButtonBuilder().setCustomId(`done_reject`).setLabel('❌ رفض').setStyle(ButtonStyle.Danger).setDisabled(true),
-    );
-    await interaction.message.edit({ components: [disabledRow] });
-
-    // إرسال لوق
-    await sendLog(interaction, clientData, request, 'approved');
-
-  } catch (err) {
-    console.error('Approve error:', err);
-    await interaction.followUp({ content: `❌ خطأ: ${err.message}`, ephemeral: true });
-  }
-}
-
-// ===== رفض الطلب =====
-async function handleReject(interaction, clientData) {
-  const requestId = interaction.customId.replace('coopup_reject_', '');
-
-  await Request.findByIdAndUpdate(requestId, {
-    status: 'rejected',
-    reviewerId: interaction.user.id,
-    reviewerTag: interaction.user.tag,
-    reviewedAt: new Date(),
-  });
+  await Request.findByIdAndUpdate(requestId, { status: 'approved', reviewerId: interaction.user.id, reviewedAt: new Date() });
 
   const disabledRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`done_approve`).setLabel('✅ موافقة').setStyle(ButtonStyle.Success).setDisabled(true),
-    new ButtonBuilder().setCustomId(`done_reject`).setLabel('❌ تم الرفض').setStyle(ButtonStyle.Danger).setDisabled(true),
+    new ButtonBuilder().setCustomId('d1').setLabel('تذكير الشخص').setStyle(ButtonStyle.Secondary).setDisabled(true),
+    new ButtonBuilder().setCustomId('d2').setLabel('تذكير الإداري').setStyle(ButtonStyle.Secondary).setDisabled(true),
+    new ButtonBuilder().setCustomId('d3').setLabel('✅ تم إرجاع الرتبة').setStyle(ButtonStyle.Success).setDisabled(true),
+    new ButtonBuilder().setCustomId('d4').setLabel('إرجاع بدون رتبة').setStyle(ButtonStyle.Danger).setDisabled(true),
   );
   await interaction.message.edit({ components: [disabledRow] });
+}
 
-  const request = await Request.findById(requestId);
-  await sendLog(interaction, clientData, request, 'rejected');
+async function handleReject(interaction, db) {
+  const requestId = interaction.customId.replace('callup_reject_', '');
   await interaction.deferUpdate();
+  await Request.findByIdAndUpdate(requestId, { status: 'rejected', reviewerId: interaction.user.id, reviewedAt: new Date() });
+
+  const disabledRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('d1').setLabel('تذكير الشخص').setStyle(ButtonStyle.Secondary).setDisabled(true),
+    new ButtonBuilder().setCustomId('d2').setLabel('تذكير الإداري').setStyle(ButtonStyle.Secondary).setDisabled(true),
+    new ButtonBuilder().setCustomId('d3').setLabel('إرجاع الرتبة').setStyle(ButtonStyle.Success).setDisabled(true),
+    new ButtonBuilder().setCustomId('d4').setLabel('✅ إرجاع بدون رتبة').setStyle(ButtonStyle.Danger).setDisabled(true),
+  );
+  await interaction.message.edit({ components: [disabledRow] });
 }
 
-// ===== إرسال اللوق =====
-async function sendLog(interaction, clientData, request, status) {
-  const { settings } = clientData;
-  if (!settings.logChannelId) return;
+async function handleRemindPerson(interaction, db) {
+  const requestId = interaction.customId.replace('callup_remind_person_', '');
+  await interaction.deferReply({ ephemeral: true });
+  const request = await Request.findById(requestId);
+  if (!request) return interaction.editReply({ content: '❌ الطلب مو موجود' });
 
-  const logChannel = interaction.guild.channels.cache.get(settings.logChannelId);
-  if (!logChannel) return;
-
-  const color = status === 'approved' ? '#00FF00' : '#FF0000';
-  const statusText = status === 'approved' ? '✅ موافق عليه' : '❌ مرفوض';
-
-  const logEmbed = new EmbedBuilder()
-    .setTitle(`📋 لوق طلب - ${statusText}`)
-    .setColor(color)
-    .addFields(
-      { name: '👤 مقدم الطلب', value: `<@${request.submitterId}> (${request.submitterId})`, inline: true },
-      { name: '🎯 المستهدف', value: `<@${request.targetUserId}> (${request.targetUserId})`, inline: true },
-      { name: '👮 المراجع', value: `<@${interaction.user.id}>`, inline: true },
-      { name: '📝 السبب', value: request.reason },
-    )
-    .setTimestamp()
-    .setFooter({ text: `طلب #${request._id}` });
-
-  if (request.evidence) logEmbed.addFields({ name: '🔗 الدليل', value: request.evidence });
-
-  await logChannel.send({ embeds: [logEmbed] });
+  try {
+    const member = await interaction.guild.members.fetch(request.targetUserId);
+    await member.send(`🔔 **تذكير:** أنت مستدعى في سيرفر **${db.guildName}**. السبب: ${request.reason}`);
+    await interaction.editReply({ content: '✅ تم إرسال التذكير للشخص' });
+  } catch {
+    await interaction.editReply({ content: '❌ ما قدرت أرسل رسالة للشخص (ربما أوقف الـ DMs)' });
+  }
 }
 
-// ===== تشغيل كل البوتات النشطة عند بدء التشغيل =====
+async function handleRemindAdmin(interaction, db) {
+  const requestId = interaction.customId.replace('callup_remind_admin_', '');
+  await interaction.deferReply({ ephemeral: true });
+
+  if (db.settings.formSubmitChannelId) {
+    const ch = interaction.guild.channels.cache.get(db.settings.formSubmitChannelId);
+    if (ch) await ch.send(`🔔 **تذكير إداري:** طلب كول-آب بانتظار المراجعة! المسؤول: <@${interaction.user.id}>`);
+  }
+  await interaction.editReply({ content: '✅ تم إرسال التذكير' });
+}
+
 async function startAllBots() {
   const clients = await DBClient.find({ isActive: true });
   console.log(`🚀 Starting ${clients.length} bots...`);
-
-  for (const clientData of clients) {
-    await startBot(clientData);
-    // تأخير بسيط بين كل بوت وثاني
+  for (const c of clients) {
+    await startBot(c);
     await new Promise(r => setTimeout(r, 1000));
   }
 }
