@@ -13,34 +13,32 @@ const { startAllBots } = require('./bot/botManager');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// مطلوب على Railway لأنه يشتغل وراء proxy
 app.set('trust proxy', 1);
 
-// ===== Middleware =====
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors({ origin: true, credentials: true }));
 
-// ===== Static Files =====
-app.use(express.static(path.join(__dirname, 'public')));
-
-// ===== Session =====
+// ===== Session (قبل كل شي) =====
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'fallback_secret_change_this',
+  secret: process.env.SESSION_SECRET || 'fallback_secret',
   resave: false,
   saveUninitialized: false,
   store: MongoStore.create({ mongoUrl: process.env.MONGODB_URI }),
   cookie: {
-    secure: false, // Railway يتعامل مع HTTPS تلقائياً
+    secure: false,
     maxAge: 7 * 24 * 60 * 60 * 1000,
   }
 }));
 
-// ===== Routes =====
+// ===== API Routes (قبل الـ static files) =====
 app.use('/api', dashboardRoutes);
 app.use('/admin/api', adminRoutes);
 
-// ===== Serve Frontend Pages =====
+// ===== Static Files =====
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ===== Frontend Pages =====
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
@@ -49,15 +47,12 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ===== Connect to MongoDB & Start =====
+// ===== Connect MongoDB & Start =====
 async function main() {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ Connected to MongoDB');
-
-    // تشغيل كل البوتات النشطة
     await startAllBots();
-
     app.listen(PORT, () => {
       console.log(`🌐 Server running on port ${PORT}`);
     });
