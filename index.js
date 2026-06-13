@@ -13,6 +13,9 @@ const { startAllBots } = require('./bot/botManager');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// مطلوب على Railway لأنه يشتغل وراء proxy
+app.set('trust proxy', 1);
+
 // ===== Middleware =====
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -28,8 +31,8 @@ app.use(session({
   saveUninitialized: false,
   store: MongoStore.create({ mongoUrl: process.env.MONGODB_URI }),
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // أسبوع
+    secure: false, // Railway يتعامل مع HTTPS تلقائياً
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   }
 }));
 
