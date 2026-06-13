@@ -11,7 +11,7 @@ const adminRoutes = require('./admin/routes');
 const { startAllBots } = require('./bot/botManager');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 // مطلوب على Railway لأنه يشتغل وراء proxy
 app.set('trust proxy', 1);
