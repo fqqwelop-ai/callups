@@ -3,498 +3,154 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CoopBot Dashboard</title>
+<title>CallUp Dashboard</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap');
-
-  :root {
-    --bg: #0d0f1a;
-    --surface: #141828;
-    --surface2: #1a2035;
-    --border: #252d45;
-    --accent: #5865F2;
-    --accent2: #7289da;
-    --success: #3ba55c;
-    --danger: #ed4245;
-    --warning: #faa81a;
-    --text: #e3e8f4;
-    --muted: #8892aa;
-    --radius: 12px;
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    font-family: 'Tajawal', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-  }
-
-  /* ===== Login Screen ===== */
-  #login-screen {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: radial-gradient(ellipse at 50% 0%, #1a2060 0%, var(--bg) 70%);
-  }
-
-  .login-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 48px 40px;
-    width: 100%;
-    max-width: 420px;
-    text-align: center;
-  }
-
-  .login-logo {
-    width: 72px;
-    height: 72px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-    margin: 0 auto 24px;
-  }
-
-  .login-card h1 { font-size: 26px; font-weight: 800; margin-bottom: 6px; }
-  .login-card p { color: var(--muted); margin-bottom: 32px; font-size: 15px; }
-
-  .form-group { margin-bottom: 16px; text-align: right; }
-  .form-group label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-
-  .form-group input, .form-group select, .form-group textarea {
-    width: 100%;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 16px;
-    color: var(--text);
-    font-family: 'Tajawal', sans-serif;
-    font-size: 15px;
-    transition: border-color .2s;
-    outline: none;
-  }
-
-  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-    border-color: var(--accent);
-  }
-
-  .btn {
-    padding: 12px 24px;
-    border-radius: var(--radius);
-    border: none;
-    font-family: 'Tajawal', sans-serif;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all .2s;
-  }
-
-  .btn-primary { background: var(--accent); color: #fff; width: 100%; }
-  .btn-primary:hover { background: var(--accent2); transform: translateY(-1px); }
-  .btn-success { background: var(--success); color: #fff; }
-  .btn-danger { background: var(--danger); color: #fff; }
-  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-  .btn:hover { opacity: .9; }
-
-  .error-msg {
-    background: rgba(237,66,69,.15);
-    border: 1px solid rgba(237,66,69,.3);
-    color: #ff7a7d;
-    padding: 10px 14px;
-    border-radius: 8px;
-    font-size: 14px;
-    margin-top: 12px;
-    display: none;
-  }
-
-  /* ===== Dashboard ===== */
-  #dashboard { display: none; }
-
-  .sidebar {
-    position: fixed;
-    right: 0;
-    top: 0;
-    width: 240px;
-    height: 100vh;
-    background: var(--surface);
-    border-left: 1px solid var(--border);
-    padding: 24px 16px;
-    display: flex;
-    flex-direction: column;
-    z-index: 100;
-  }
-
-  .sidebar-logo {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px;
-    margin-bottom: 28px;
-  }
-
-  .sidebar-logo-icon {
-    width: 42px; height: 42px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 20px;
-  }
-
-  .sidebar-logo-text h2 { font-size: 16px; font-weight: 800; }
-  .sidebar-logo-text span { font-size: 12px; color: var(--muted); }
-
-  .nav-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: all .2s;
-    color: var(--muted);
-    font-size: 14px;
-    font-weight: 500;
-    margin-bottom: 2px;
-    border: none;
-    background: none;
-    width: 100%;
-    text-align: right;
-    font-family: 'Tajawal', sans-serif;
-  }
-
-  .nav-item:hover { background: var(--surface2); color: var(--text); }
-  .nav-item.active { background: rgba(88,101,242,.2); color: var(--accent); }
-  .nav-item .icon { font-size: 18px; }
-
-  .sidebar-bot-status {
-    margin-top: auto;
-    padding: 12px;
-    background: var(--surface2);
-    border-radius: 10px;
-    font-size: 13px;
-  }
-
-  .status-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    margin-left: 6px;
-  }
-  .status-dot.online { background: var(--success); box-shadow: 0 0 8px var(--success); }
-  .status-dot.offline { background: var(--danger); }
-
-  .main-content {
-    margin-right: 240px;
-    padding: 32px;
-    min-height: 100vh;
-  }
-
-  .page-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 28px;
-  }
-
-  .page-header h1 { font-size: 22px; font-weight: 800; }
-  .page-header p { color: var(--muted); font-size: 14px; margin-top: 3px; }
-
-  /* ===== Stats Cards ===== */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 28px;
-  }
-
-  .stat-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 20px;
-  }
-
-  .stat-card .stat-icon {
-    font-size: 28px;
-    margin-bottom: 12px;
-    display: block;
-  }
-
-  .stat-card .stat-value {
-    font-size: 28px;
-    font-weight: 900;
-    line-height: 1;
-  }
-
-  .stat-card .stat-label {
-    font-size: 13px;
-    color: var(--muted);
-    margin-top: 4px;
-  }
-
-  /* ===== Cards ===== */
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 24px;
-    margin-bottom: 20px;
-  }
-
-  .card-title {
-    font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .settings-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-  }
-
-  .color-input-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .color-input-row input[type="color"] {
-    width: 44px;
-    height: 44px;
-    padding: 2px;
-    border-radius: 8px;
-    cursor: pointer;
-    flex-shrink: 0;
-  }
-
-  .toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .toggle-row:last-child { border-bottom: none; }
-
-  .toggle {
-    position: relative;
-    width: 44px;
-    height: 24px;
-  }
-
-  .toggle input { opacity: 0; width: 0; height: 0; }
-
-  .toggle-slider {
-    position: absolute;
-    inset: 0;
-    background: var(--border);
-    border-radius: 24px;
-    cursor: pointer;
-    transition: .2s;
-  }
-
-  .toggle-slider::before {
-    content: '';
-    position: absolute;
-    height: 18px; width: 18px;
-    left: 3px; top: 3px;
-    background: white;
-    border-radius: 50%;
-    transition: .2s;
-  }
-
-  .toggle input:checked + .toggle-slider { background: var(--accent); }
-  .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
-
-  /* ===== Requests Table ===== */
-  .requests-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-  }
-
-  .requests-table th {
-    text-align: right;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
-    color: var(--muted);
-    font-weight: 600;
-    font-size: 13px;
-  }
-
-  .requests-table td {
-    padding: 14px 16px;
-    border-bottom: 1px solid rgba(37,45,69,.5);
-  }
-
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-
-  .badge-pending { background: rgba(250,168,26,.15); color: var(--warning); }
-  .badge-approved { background: rgba(59,165,92,.15); color: var(--success); }
-  .badge-rejected { background: rgba(237,66,69,.15); color: var(--danger); }
-
-  /* ===== Pages visibility ===== */
-  .page { display: none; }
-  .page.active { display: block; }
-
-  /* ===== Toast ===== */
-  #toast {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%) translateY(80px);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 12px 24px;
-    border-radius: 30px;
-    font-size: 14px;
-    transition: transform .3s;
-    z-index: 9999;
-  }
-
-  #toast.show { transform: translateX(-50%) translateY(0); }
-
-  .save-btn-row {
-    display: flex;
-    justify-content: flex-start;
-    margin-top: 20px;
-  }
-
-  @media (max-width: 900px) {
-    .sidebar { display: none; }
-    .main-content { margin-right: 0; padding: 20px 16px; }
-    .stats-grid { grid-template-columns: repeat(2, 1fr); }
-    .settings-grid { grid-template-columns: 1fr; }
-  }
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap');
+:root {
+  --bg: #0d0f1a; --surface: #141828; --surface2: #1a2035; --border: #252d45;
+  --accent: #5865F2; --accent2: #7289da; --success: #3ba55c; --danger: #ed4245;
+  --warning: #faa81a; --text: #e3e8f4; --muted: #8892aa; --radius: 12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Tajawal',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+#login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; background:radial-gradient(ellipse at 50% 0%,#1a2060 0%,var(--bg) 70%); }
+.login-card { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:48px 40px; width:100%; max-width:420px; text-align:center; }
+.login-logo { width:72px; height:72px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:32px; margin:0 auto 24px; }
+.login-card h1 { font-size:26px; font-weight:800; margin-bottom:6px; }
+.login-card p { color:var(--muted); margin-bottom:32px; font-size:15px; }
+.form-group { margin-bottom:16px; text-align:right; }
+.form-group label { display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
+.form-group input,.form-group select,.form-group textarea { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:12px 16px; color:var(--text); font-family:'Tajawal',sans-serif; font-size:15px; transition:border-color .2s; outline:none; }
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus { border-color:var(--accent); }
+.form-group textarea { resize:vertical; }
+.btn { padding:12px 24px; border-radius:var(--radius); border:none; font-family:'Tajawal',sans-serif; font-size:15px; font-weight:700; cursor:pointer; transition:all .2s; }
+.btn-primary { background:var(--accent); color:#fff; width:100%; }
+.btn-primary:hover { background:var(--accent2); }
+.btn-success { background:var(--success); color:#fff; }
+.btn-danger { background:var(--danger); color:#fff; }
+.btn-secondary { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
+.btn-sm { padding:8px 16px; font-size:13px; }
+.btn:hover { opacity:.9; transform:translateY(-1px); }
+.error-msg { background:rgba(237,66,69,.15); border:1px solid rgba(237,66,69,.3); color:#ff7a7d; padding:10px 14px; border-radius:8px; font-size:14px; margin-top:12px; display:none; }
+#dashboard { display:none; }
+.sidebar { position:fixed; right:0; top:0; width:240px; height:100vh; background:var(--surface); border-left:1px solid var(--border); padding:24px 16px; display:flex; flex-direction:column; z-index:100; overflow-y:auto; }
+.sidebar-logo { display:flex; align-items:center; gap:12px; padding:8px; margin-bottom:28px; }
+.sidebar-logo-icon { width:42px; height:42px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:20px; }
+.sidebar-logo-text h2 { font-size:16px; font-weight:800; }
+.sidebar-logo-text span { font-size:12px; color:var(--muted); }
+.nav-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; cursor:pointer; transition:all .2s; color:var(--muted); font-size:14px; font-weight:500; margin-bottom:2px; border:none; background:none; width:100%; text-align:right; font-family:'Tajawal',sans-serif; }
+.nav-item:hover { background:var(--surface2); color:var(--text); }
+.nav-item.active { background:rgba(88,101,242,.2); color:var(--accent); }
+.nav-item .icon { font-size:18px; }
+.sidebar-bot-status { margin-top:auto; padding:12px; background:var(--surface2); border-radius:10px; font-size:13px; }
+.status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-left:6px; }
+.status-dot.online { background:var(--success); box-shadow:0 0 8px var(--success); }
+.status-dot.offline { background:var(--danger); }
+.main-content { margin-right:240px; padding:32px; min-height:100vh; }
+.page-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; }
+.page-header h1 { font-size:22px; font-weight:800; }
+.page-header p { color:var(--muted); font-size:14px; margin-top:3px; }
+.stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; }
+.stat-card .stat-icon { font-size:28px; margin-bottom:12px; display:block; }
+.stat-card .stat-value { font-size:28px; font-weight:900; line-height:1; }
+.stat-card .stat-label { font-size:13px; color:var(--muted); margin-top:4px; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px; margin-bottom:20px; }
+.card-title { font-size:16px; font-weight:700; margin-bottom:20px; display:flex; align-items:center; gap:8px; }
+.settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.color-input-row { display:flex; gap:8px; align-items:center; }
+.color-input-row input[type="color"] { width:44px; height:44px; padding:2px; border-radius:8px; cursor:pointer; flex-shrink:0; }
+.toggle-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--border); }
+.toggle-row:last-child { border-bottom:none; }
+.toggle { position:relative; width:44px; height:24px; flex-shrink:0; }
+.toggle input { opacity:0; width:0; height:0; }
+.toggle-slider { position:absolute; inset:0; background:var(--border); border-radius:24px; cursor:pointer; transition:.2s; }
+.toggle-slider::before { content:''; position:absolute; height:18px; width:18px; left:3px; top:3px; background:white; border-radius:50%; transition:.2s; }
+.toggle input:checked + .toggle-slider { background:var(--accent); }
+.toggle input:checked + .toggle-slider::before { transform:translateX(20px); }
+.requests-table { width:100%; border-collapse:collapse; font-size:14px; }
+.requests-table th { text-align:right; padding:12px 16px; border-bottom:1px solid var(--border); color:var(--muted); font-weight:600; font-size:13px; }
+.requests-table td { padding:14px 16px; border-bottom:1px solid rgba(37,45,69,.5); }
+.badge { display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+.badge-pending { background:rgba(250,168,26,.15); color:var(--warning); }
+.badge-approved { background:rgba(59,165,92,.15); color:var(--success); }
+.badge-rejected { background:rgba(237,66,69,.15); color:var(--danger); }
+.page { display:none; }
+.page.active { display:block; }
+#toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--surface); border:1px solid var(--border); color:var(--text); padding:12px 24px; border-radius:30px; font-size:14px; transition:transform .3s; z-index:9999; }
+#toast.show { transform:translateX(-50%) translateY(0); }
+.save-btn-row { display:flex; justify-content:flex-start; gap:12px; margin-top:20px; flex-wrap:wrap; }
+.section-divider { border:none; border-top:1px solid var(--border); margin:20px 0; }
+.label-input-row { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
+.label-input-row:last-child { border-bottom:none; }
+.label-input-row span { flex:1; font-size:14px; }
+.label-input-row input { flex:2; }
+@media(max-width:900px) { .sidebar{display:none;} .main-content{margin-right:0;padding:20px 16px;} .stats-grid{grid-template-columns:repeat(2,1fr);} .settings-grid{grid-template-columns:1fr;} }
 </style>
 </head>
 <body>
 
-<!-- ===== Login Screen ===== -->
 <div id="login-screen">
   <div class="login-card">
-    <div class="login-logo">🛡️</div>
-    <h1>CoopBot Dashboard</h1>
+    <div class="login-logo">📞</div>
+    <h1>CallUp Dashboard</h1>
     <p>سجّل دخول بـ Guild ID وكلمة المرور</p>
-
     <div class="form-group">
       <label>Guild ID (آيدي السيرفر)</label>
       <input type="text" id="login-guild" placeholder="123456789012345678">
     </div>
     <div class="form-group">
       <label>كلمة المرور</label>
-      <input type="password" id="login-pass" placeholder="••••••••">
+      <input type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
     </div>
     <button class="btn btn-primary" onclick="doLogin()">تسجيل الدخول</button>
     <div class="error-msg" id="login-error"></div>
   </div>
 </div>
 
-<!-- ===== Dashboard ===== -->
 <div id="dashboard">
-  <!-- Sidebar -->
   <div class="sidebar">
     <div class="sidebar-logo">
-      <div class="sidebar-logo-icon">🛡️</div>
+      <div class="sidebar-logo-icon">📞</div>
       <div class="sidebar-logo-text">
-        <h2>CoopBot</h2>
+        <h2>CallUp</h2>
         <span id="guild-name-display">--</span>
       </div>
     </div>
-
-    <button class="nav-item active" onclick="showPage('home', this)">
-      <span class="icon">📊</span> الرئيسية
-    </button>
-    <button class="nav-item" onclick="showPage('embed', this)">
-      <span class="icon">📢</span> إعدادات الإمبيد
-    </button>
-    <button class="nav-item" onclick="showPage('roles', this)">
-      <span class="icon">🎭</span> الرتب
-    </button>
-    <button class="nav-item" onclick="showPage('channels', this)">
-      <span class="icon">💬</span> الروم
-    </button>
-    <button class="nav-item" onclick="showPage('form', this)">
-      <span class="icon">📋</span> إعدادات الفورم
-    </button>
-    <button class="nav-item" onclick="showPage('requests', this)">
-      <span class="icon">📬</span> الطلبات
-    </button>
-
+    <button class="nav-item active" onclick="showPage('home',this)"><span class="icon">📊</span> الرئيسية</button>
+    <button class="nav-item" onclick="showPage('embed',this)"><span class="icon">📢</span> الإمبيد</button>
+    <button class="nav-item" onclick="showPage('roles',this)"><span class="icon">🎭</span> الرتب</button>
+    <button class="nav-item" onclick="showPage('channels',this)"><span class="icon">💬</span> الروم</button>
+    <button class="nav-item" onclick="showPage('form',this)"><span class="icon">📋</span> الفورم</button>
+    <button class="nav-item" onclick="showPage('log',this)"><span class="icon">📝</span> إعدادات اللوق</button>
+    <button class="nav-item" onclick="showPage('messages',this)"><span class="icon">✉️</span> الرسائل التلقائية</button>
+    <button class="nav-item" onclick="showPage('requests',this)"><span class="icon">📬</span> الاستدعاءات</button>
     <div class="sidebar-bot-status">
       <span class="status-dot" id="bot-status-dot"></span>
       <span id="bot-status-text">جاري التحقق...</span>
     </div>
   </div>
 
-  <!-- Main Content -->
   <div class="main-content">
 
-    <!-- Home Page -->
+    <!-- Home -->
     <div class="page active" id="page-home">
-      <div class="page-header">
-        <div>
-          <h1>الرئيسية</h1>
-          <p>نظرة عامة على البوت والطلبات</p>
-        </div>
-      </div>
+      <div class="page-header"><div><h1>الرئيسية</h1><p>نظرة عامة</p></div></div>
       <div class="stats-grid">
-        <div class="stat-card">
-          <span class="stat-icon">📬</span>
-          <div class="stat-value" id="stat-total">--</div>
-          <div class="stat-label">إجمالي الطلبات</div>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon">⏳</span>
-          <div class="stat-value" id="stat-pending">--</div>
-          <div class="stat-label">قيد الانتظار</div>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon">✅</span>
-          <div class="stat-value" id="stat-approved">--</div>
-          <div class="stat-label">موافق عليها</div>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon">❌</span>
-          <div class="stat-value" id="stat-rejected">--</div>
-          <div class="stat-label">مرفوضة</div>
-        </div>
+        <div class="stat-card"><span class="stat-icon">📬</span><div class="stat-value" id="stat-total">--</div><div class="stat-label">إجمالي الاستدعاءات</div></div>
+        <div class="stat-card"><span class="stat-icon">⏳</span><div class="stat-value" id="stat-pending">--</div><div class="stat-label">قيد الانتظار</div></div>
+        <div class="stat-card"><span class="stat-icon">✅</span><div class="stat-value" id="stat-approved">--</div><div class="stat-label">تم إرجاع رتبتهم</div></div>
+        <div class="stat-card"><span class="stat-icon">❌</span><div class="stat-value" id="stat-rejected">--</div><div class="stat-label">إرجاع بدون رتبة</div></div>
       </div>
     </div>
 
-    <!-- Embed Settings -->
+    <!-- Embed -->
     <div class="page" id="page-embed">
-      <div class="page-header">
-        <div><h1>إعدادات الإمبيد</h1><p>تخصيص الرسالة الثابتة في السيرفر</p></div>
-      </div>
+      <div class="page-header"><div><h1>إعدادات الإمبيد</h1><p>تخصيص الرسالة الثابتة</p></div></div>
       <div class="card">
         <div class="card-title">✏️ محتوى الإمبيد</div>
         <div class="settings-grid">
-          <div class="form-group">
-            <label>عنوان الإمبيد</label>
-            <input type="text" id="embed-title" placeholder="🛡️ طلب كوب-آب">
-          </div>
+          <div class="form-group"><label>عنوان الإمبيد</label><input type="text" id="embed-title" placeholder="📞 استدعاء"></div>
           <div class="form-group">
             <label>لون الإمبيد</label>
             <div class="color-input-row">
@@ -502,155 +158,182 @@
               <input type="text" id="embed-color-text" placeholder="#5865F2" oninput="document.getElementById('embed-color-picker').value=this.value">
             </div>
           </div>
-          <div class="form-group" style="grid-column: span 2">
-            <label>وصف الإمبيد</label>
-            <textarea id="embed-desc" rows="3" placeholder="اضغط الزر أدناه لتقديم طلب كوب-آب"></textarea>
-          </div>
-          <div class="form-group">
-            <label>نص الزر</label>
-            <input type="text" id="btn-label" placeholder="📋 تقديم طلب">
-          </div>
+          <div class="form-group" style="grid-column:span 2"><label>وصف الإمبيد</label><textarea id="embed-desc" rows="3" placeholder="اضغط الزر أدناه للاستدعاء"></textarea></div>
+          <div class="form-group"><label>نص الزر</label><input type="text" id="btn-label" placeholder="📋 تقديم استدعاء"></div>
           <div class="form-group">
             <label>لون الزر</label>
             <select id="btn-color">
-              <option value="Primary">🔵 أزرق (Primary)</option>
-              <option value="Secondary">⚫ رمادي (Secondary)</option>
-              <option value="Success">🟢 أخضر (Success)</option>
-              <option value="Danger">🔴 أحمر (Danger)</option>
+              <option value="Primary">🔵 أزرق</option>
+              <option value="Secondary">⚫ رمادي</option>
+              <option value="Success">🟢 أخضر</option>
+              <option value="Danger">🔴 أحمر</option>
             </select>
           </div>
-          <div class="form-group">
-            <label>آيدي روم الإمبيد</label>
-            <input type="text" id="embed-channel" placeholder="آيدي الروم">
-          </div>
+          <div class="form-group"><label>آيدي روم الإمبيد</label><input type="text" id="embed-channel" placeholder="آيدي الروم"></div>
         </div>
         <div class="save-btn-row">
-          <button class="btn btn-primary" onclick="saveSettings()" style="width: auto; margin-left: 12px">💾 حفظ</button>
-          <button class="btn btn-success" onclick="deployEmbed()">📢 نشر الإمبيد في الروم</button>
+          <button class="btn btn-primary btn-sm" onclick="saveSettings()" style="width:auto">💾 حفظ</button>
+          <button class="btn btn-success btn-sm" onclick="deployEmbed()">📢 نشر الإمبيد</button>
         </div>
       </div>
     </div>
 
-    <!-- Roles Settings -->
+    <!-- Roles -->
     <div class="page" id="page-roles">
-      <div class="page-header">
-        <div><h1>إعدادات الرتب</h1><p>الرتبة اللي تنشال والرتبة اللي تنحط</p></div>
-      </div>
+      <div class="page-header"><div><h1>إعدادات الرتب</h1><p>الرتبة اللي تنشال والرتبة اللي تنحط عند الاستدعاء</p></div></div>
       <div class="card">
         <div class="card-title">🎭 الرتب</div>
         <div class="settings-grid">
-          <div class="form-group">
-            <label>آيدي الرتبة اللي تنشال</label>
-            <input type="text" id="role-remove" placeholder="آيدي الرتبة">
-          </div>
-          <div class="form-group">
-            <label>آيدي الرتبة اللي تنحط</label>
-            <input type="text" id="role-add" placeholder="آيدي الرتبة">
-          </div>
+          <div class="form-group"><label>آيدي الرتبة اللي تنشال</label><input type="text" id="role-remove" placeholder="آيدي الرتبة"></div>
+          <div class="form-group"><label>آيدي الرتبة اللي تنحط (كول-آب)</label><input type="text" id="role-add" placeholder="آيدي الرتبة"></div>
         </div>
-        <div class="save-btn-row">
-          <button class="btn btn-primary" onclick="saveSettings()" style="width: auto">💾 حفظ</button>
-        </div>
+        <div class="save-btn-row"><button class="btn btn-primary btn-sm" onclick="saveSettings()" style="width:auto">💾 حفظ</button></div>
       </div>
     </div>
 
-    <!-- Channels Settings -->
+    <!-- Channels -->
     <div class="page" id="page-channels">
-      <div class="page-header">
-        <div><h1>إعدادات الروم</h1><p>روم الطلبات واللوق</p></div>
-      </div>
+      <div class="page-header"><div><h1>إعدادات الروم</h1><p>روم اللوق والمراقبة</p></div></div>
       <div class="card">
         <div class="card-title">💬 الروم</div>
         <div class="settings-grid">
-          <div class="form-group">
-            <label>روم استقبال الطلبات</label>
-            <input type="text" id="submit-channel" placeholder="آيدي الروم">
-          </div>
-          <div class="form-group">
-            <label>روم اللوق</label>
-            <input type="text" id="log-channel" placeholder="آيدي الروم">
+          <div class="form-group"><label>روم اللوق (يجي فيه كل استدعاء)</label><input type="text" id="log-channel" placeholder="آيدي الروم"></div>
+          <div class="form-group"><label>روم استقبال الطلبات الإدارية</label><input type="text" id="submit-channel" placeholder="آيدي الروم"></div>
+          <div class="form-group" style="grid-column:span 2">
+            <label>روم المراقبة 👁️ (لما يدخله المستدعى يجي إشعار للمستدعي)</label>
+            <input type="text" id="watch-channel" placeholder="آيدي الروم (اختياري)">
           </div>
         </div>
-        <div class="save-btn-row">
-          <button class="btn btn-primary" onclick="saveSettings()" style="width: auto">💾 حفظ</button>
-        </div>
+        <div class="save-btn-row"><button class="btn btn-primary btn-sm" onclick="saveSettings()" style="width:auto">💾 حفظ</button></div>
       </div>
     </div>
 
     <!-- Form Settings -->
     <div class="page" id="page-form">
-      <div class="page-header">
-        <div><h1>إعدادات الفورم</h1><p>الحقول اللي تظهر في الفورم</p></div>
-      </div>
+      <div class="page-header"><div><h1>إعدادات الفورم</h1><p>الحقول اللي تظهر في الفورم</p></div></div>
       <div class="card">
         <div class="card-title">📋 حقول الفورم</div>
         <div class="toggle-row">
-          <div>
-            <div style="font-weight:600">كوبي آيدي الشخص</div>
-            <div style="font-size:13px;color:var(--muted)">ثابت دائماً</div>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" id="field-userid" checked disabled>
-            <span class="toggle-slider"></span>
-          </label>
+          <div><div style="font-weight:600">كوبي آيدي الشخص</div><div style="font-size:13px;color:var(--muted)">ثابت دائماً</div></div>
+          <label class="toggle"><input type="checkbox" checked disabled><span class="toggle-slider"></span></label>
         </div>
         <div class="toggle-row">
           <div><div style="font-weight:600">السبب</div></div>
-          <label class="toggle">
-            <input type="checkbox" id="field-reason" checked>
-            <span class="toggle-slider"></span>
-          </label>
+          <label class="toggle"><input type="checkbox" id="field-reason" checked><span class="toggle-slider"></span></label>
         </div>
         <div class="toggle-row">
           <div><div style="font-weight:600">الدليل (رابط)</div></div>
-          <label class="toggle">
-            <input type="checkbox" id="field-evidence" checked>
-            <span class="toggle-slider"></span>
-          </label>
+          <label class="toggle"><input type="checkbox" id="field-evidence" checked><span class="toggle-slider"></span></label>
         </div>
         <div class="toggle-row">
-          <div style="flex:1; padding-left:16px">
+          <div><div style="font-weight:600">الموعد النهائي</div></div>
+          <label class="toggle"><input type="checkbox" id="field-deadline" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div style="flex:1;padding-left:16px">
             <div style="font-weight:600">حقل مخصص 1</div>
             <input type="text" id="field-custom1" placeholder="اسم الحقل (اتركه فارغ لإخفائه)" style="margin-top:8px">
           </div>
         </div>
         <div class="toggle-row">
-          <div style="flex:1; padding-left:16px">
+          <div style="flex:1;padding-left:16px">
             <div style="font-weight:600">حقل مخصص 2</div>
             <input type="text" id="field-custom2" placeholder="اسم الحقل (اتركه فارغ لإخفائه)" style="margin-top:8px">
           </div>
         </div>
-        <div class="save-btn-row">
-          <button class="btn btn-primary" onclick="saveSettings()" style="width: auto">💾 حفظ</button>
-        </div>
+        <div class="save-btn-row"><button class="btn btn-primary btn-sm" onclick="saveSettings()" style="width:auto">💾 حفظ</button></div>
       </div>
     </div>
 
-    <!-- Requests Page -->
+    <!-- Log Settings -->
+    <div class="page" id="page-log">
+      <div class="page-header"><div><h1>إعدادات اللوق</h1><p>تخصيص ما يظهر في لوق الاستدعاء</p></div></div>
+      
+      <div class="card">
+        <div class="card-title">☑️ وش يظهر في اللوق</div>
+        <div class="toggle-row">
+          <div><div style="font-weight:600">المستدعي (تنفذ بواسطة)</div></div>
+          <label class="toggle"><input type="checkbox" id="log-show-submitter" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div style="font-weight:600">المستدعى</div></div>
+          <label class="toggle"><input type="checkbox" id="log-show-target" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div style="font-weight:600">السبب</div></div>
+          <label class="toggle"><input type="checkbox" id="log-show-reason" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div style="font-weight:600">الدليل</div></div>
+          <label class="toggle"><input type="checkbox" id="log-show-evidence" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div style="font-weight:600">الموعد النهائي</div></div>
+          <label class="toggle"><input type="checkbox" id="log-show-deadline" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div style="font-weight:600">التغيير (إزالة/إضافة رتبة)</div></div>
+          <label class="toggle"><input type="checkbox" id="log-show-rolechange" checked><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">✏️ تخصيص أسماء الحقول في اللوق</div>
+        <div class="label-input-row"><span>اسم حقل المستدعي</span><input type="text" id="label-submitter" placeholder="تنفذ بواسطة"></div>
+        <div class="label-input-row"><span>اسم حقل المستدعى</span><input type="text" id="label-target" placeholder="المستدعى"></div>
+        <div class="label-input-row"><span>اسم حقل السبب</span><input type="text" id="label-reason" placeholder="السبب"></div>
+        <div class="label-input-row"><span>اسم حقل الدليل</span><input type="text" id="label-evidence" placeholder="الدليل"></div>
+        <div class="label-input-row"><span>اسم حقل الموعد</span><input type="text" id="label-deadline" placeholder="الموعد النهائي"></div>
+        <div class="label-input-row"><span>اسم حقل التغيير</span><input type="text" id="label-rolechange" placeholder="التغيير"></div>
+        <div class="save-btn-row"><button class="btn btn-primary btn-sm" onclick="saveSettings()" style="width:auto">💾 حفظ</button></div>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="page" id="page-messages">
+      <div class="page-header"><div><h1>الرسائل التلقائية</h1><p>الرسائل اللي يرسلها البوت تلقائياً</p></div></div>
+      
+      <div class="card">
+        <div class="card-title">✉️ رسالة للمستدعى عند تنفيذ الكول-آب</div>
+        <div class="toggle-row" style="margin-bottom:16px">
+          <div><div style="font-weight:600">تفعيل الرسالة التلقائية</div><div style="font-size:13px;color:var(--muted)">البوت يرسل DM للمستدعى</div></div>
+          <label class="toggle"><input type="checkbox" id="dm-target-enabled" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div class="form-group">
+          <label>نص الرسالة (متاح: {server} {reason} {submitter})</label>
+          <textarea id="dm-target-msg" rows="3" placeholder="تم استدعاؤك في {server}. السبب: {reason}"></textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🔔 رسالة للمستدعي لما يدخل المستدعى الروم المحدد</div>
+        <div class="toggle-row" style="margin-bottom:16px">
+          <div><div style="font-weight:600">تفعيل إشعار دخول الروم</div><div style="font-size:13px;color:var(--muted)">يشترط تحديد روم المراقبة في إعدادات الروم</div></div>
+          <label class="toggle"><input type="checkbox" id="dm-submitter-enabled" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div class="form-group">
+          <label>نص الرسالة (متاح: {target} {server})</label>
+          <textarea id="dm-submitter-msg" rows="3" placeholder="دخل {target} الروم المحدد!"></textarea>
+        </div>
+        <div class="save-btn-row"><button class="btn btn-primary btn-sm" onclick="saveSettings()" style="width:auto">💾 حفظ</button></div>
+      </div>
+    </div>
+
+    <!-- Requests -->
     <div class="page" id="page-requests">
       <div class="page-header">
-        <div><h1>الطلبات</h1><p>سجل كل طلبات الكوب-آب</p></div>
+        <div><h1>الاستدعاءات</h1><p>سجل كل الاستدعاءات</p></div>
         <select onchange="loadRequests(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 16px;border-radius:8px;font-family:'Tajawal',sans-serif;font-size:14px">
           <option value="">الكل</option>
           <option value="pending">⏳ قيد الانتظار</option>
-          <option value="approved">✅ موافق عليها</option>
-          <option value="rejected">❌ مرفوضة</option>
+          <option value="approved">✅ تم إرجاع الرتبة</option>
+          <option value="rejected">❌ إرجاع بدون رتبة</option>
         </select>
       </div>
-      <div class="card" style="padding: 0; overflow: hidden">
+      <div class="card" style="padding:0;overflow:hidden">
         <table class="requests-table">
-          <thead>
-            <tr>
-              <th>مقدم الطلب</th>
-              <th>المستهدف (آيدي)</th>
-              <th>السبب</th>
-              <th>الحالة</th>
-              <th>التاريخ</th>
-            </tr>
-          </thead>
-          <tbody id="requests-tbody">
-            <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted)">جاري التحميل...</td></tr>
-          </tbody>
+          <thead><tr><th>المستدعي</th><th>المستدعى</th><th>السبب</th><th>الموعد</th><th>الحالة</th><th>التاريخ</th></tr></thead>
+          <tbody id="requests-tbody"><tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted)">جاري التحميل...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -658,13 +341,10 @@
   </div>
 </div>
 
-<!-- Toast -->
 <div id="toast"></div>
 
 <script>
-let currentSettings = {};
-
-function showToast(msg, ok = true) {
+function showToast(msg, ok=true) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.style.borderColor = ok ? 'var(--success)' : 'var(--danger)';
@@ -676,181 +356,175 @@ async function doLogin() {
   const guildId = document.getElementById('login-guild').value.trim();
   const password = document.getElementById('login-pass').value;
   const errEl = document.getElementById('login-error');
-
   try {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ guildId, password })
-    });
+    const res = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify({guildId, password}) });
     const data = await res.json();
-    if (!res.ok) {
-      errEl.textContent = data.error;
-      errEl.style.display = 'block';
-      return;
-    }
-    errEl.style.display = 'none';
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'block';
-    document.getElementById('guild-name-display').textContent = data.guildName;
-    updateBotStatus(data.botActive);
-    loadStats();
-    loadSettings();
-  } catch(e) {
-    errEl.textContent = 'خطأ في الاتصال';
-    errEl.style.display = 'block';
-  }
+    if (!res.ok) { errEl.textContent=data.error; errEl.style.display='block'; return; }
+    errEl.style.display='none';
+    showDashboard(data.guildName, data.botActive);
+    loadStats(); loadSettings();
+  } catch { errEl.textContent='خطأ في الاتصال'; errEl.style.display='block'; }
+}
+
+function showDashboard(name, botActive) {
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('dashboard').style.display='block';
+  document.getElementById('guild-name-display').textContent=name;
+  updateBotStatus(botActive);
 }
 
 function updateBotStatus(active) {
-  document.getElementById('bot-status-dot').className = 'status-dot ' + (active ? 'online' : 'offline');
-  document.getElementById('bot-status-text').textContent = active ? 'البوت نشط' : 'البوت متوقف';
+  document.getElementById('bot-status-dot').className='status-dot '+(active?'online':'offline');
+  document.getElementById('bot-status-text').textContent=active?'البوت نشط':'البوت متوقف';
 }
 
 function showPage(name, btn) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
   btn.classList.add('active');
-  if (name === 'requests') loadRequests('');
+  if (name==='requests') loadRequests('');
 }
 
 async function loadStats() {
-  const res = await fetch('/api/stats', { credentials: 'include' });
+  const res = await fetch('/api/stats', {credentials:'include'});
   const data = await res.json();
-  document.getElementById('stat-total').textContent = data.total;
-  document.getElementById('stat-pending').textContent = data.pending;
-  document.getElementById('stat-approved').textContent = data.approved;
-  document.getElementById('stat-rejected').textContent = data.rejected;
+  document.getElementById('stat-total').textContent=data.total;
+  document.getElementById('stat-pending').textContent=data.pending;
+  document.getElementById('stat-approved').textContent=data.approved;
+  document.getElementById('stat-rejected').textContent=data.rejected;
   updateBotStatus(data.botActive);
 }
 
 async function loadSettings() {
-  const res = await fetch('/api/settings', { credentials: 'include' });
+  const res = await fetch('/api/settings', {credentials:'include'});
+  if (!res.ok) return;
   const data = await res.json();
-  currentSettings = data;
   const s = data.settings;
 
-  document.getElementById('embed-title').value = s.embedTitle || '';
-  document.getElementById('embed-desc').value = s.embedDescription || '';
-  document.getElementById('embed-color-text').value = s.embedColor || '#5865F2';
-  document.getElementById('embed-color-picker').value = s.embedColor || '#5865F2';
-  document.getElementById('btn-label').value = s.buttonLabel || '';
-  document.getElementById('btn-color').value = s.buttonColor || 'Primary';
-  document.getElementById('embed-channel').value = s.embedChannelId || '';
-  document.getElementById('role-remove').value = s.roleToRemove || '';
-  document.getElementById('role-add').value = s.roleToAdd || '';
-  document.getElementById('submit-channel').value = s.formSubmitChannelId || '';
-  document.getElementById('log-channel').value = s.logChannelId || '';
-  document.getElementById('field-reason').checked = s.formFields?.reason !== false;
-  document.getElementById('field-evidence').checked = s.formFields?.evidence !== false;
-  document.getElementById('field-custom1').value = s.formFields?.customField1 || '';
-  document.getElementById('field-custom2').value = s.formFields?.customField2 || '';
+  document.getElementById('embed-title').value=s.embedTitle||'';
+  document.getElementById('embed-desc').value=s.embedDescription||'';
+  document.getElementById('embed-color-text').value=s.embedColor||'#5865F2';
+  document.getElementById('embed-color-picker').value=s.embedColor||'#5865F2';
+  document.getElementById('btn-label').value=s.buttonLabel||'';
+  document.getElementById('btn-color').value=s.buttonColor||'Primary';
+  document.getElementById('embed-channel').value=s.embedChannelId||'';
+  document.getElementById('role-remove').value=s.roleToRemove||'';
+  document.getElementById('role-add').value=s.roleToAdd||'';
+  document.getElementById('log-channel').value=s.logChannelId||'';
+  document.getElementById('submit-channel').value=s.formSubmitChannelId||'';
+  document.getElementById('watch-channel').value=s.watchChannelId||'';
+  document.getElementById('field-reason').checked=s.formFields?.reason!==false;
+  document.getElementById('field-evidence').checked=s.formFields?.evidence!==false;
+  document.getElementById('field-deadline').checked=s.formFields?.deadline!==false;
+  document.getElementById('field-custom1').value=s.formFields?.customField1||'';
+  document.getElementById('field-custom2').value=s.formFields?.customField2||'';
+
+  // Log fields
+  const lf = s.logFields||{};
+  document.getElementById('log-show-submitter').checked=lf.showSubmitter!==false;
+  document.getElementById('log-show-target').checked=lf.showTarget!==false;
+  document.getElementById('log-show-reason').checked=lf.showReason!==false;
+  document.getElementById('log-show-evidence').checked=lf.showEvidence!==false;
+  document.getElementById('log-show-deadline').checked=lf.showDeadline!==false;
+  document.getElementById('log-show-rolechange').checked=lf.showRoleChange!==false;
+
+  // Labels
+  const ll = s.logLabels||{};
+  document.getElementById('label-submitter').value=ll.submitter||'';
+  document.getElementById('label-target').value=ll.target||'';
+  document.getElementById('label-reason').value=ll.reason||'';
+  document.getElementById('label-evidence').value=ll.evidence||'';
+  document.getElementById('label-deadline').value=ll.deadline||'';
+  document.getElementById('label-rolechange').value=ll.roleChange||'';
+
+  // Messages
+  document.getElementById('dm-target-enabled').checked=s.dmToTarget!==false;
+  document.getElementById('dm-target-msg').value=s.dmToTargetMessage||'';
+  document.getElementById('dm-submitter-enabled').checked=s.dmToSubmitterOnJoin!==false;
+  document.getElementById('dm-submitter-msg').value=s.dmToSubmitterMessage||'';
 }
 
 async function saveSettings() {
-  const body = {
-    settings: {
-      embedChannelId: document.getElementById('embed-channel').value.trim(),
-      embedTitle: document.getElementById('embed-title').value.trim(),
-      embedDescription: document.getElementById('embed-desc').value.trim(),
-      embedColor: document.getElementById('embed-color-text').value.trim(),
-      buttonLabel: document.getElementById('btn-label').value.trim(),
-      buttonColor: document.getElementById('btn-color').value,
-      roleToRemove: document.getElementById('role-remove').value.trim(),
-      roleToAdd: document.getElementById('role-add').value.trim(),
-      formSubmitChannelId: document.getElementById('submit-channel').value.trim(),
-      logChannelId: document.getElementById('log-channel').value.trim(),
-      formFields: {
-        reason: document.getElementById('field-reason').checked,
-        evidence: document.getElementById('field-evidence').checked,
-        customField1: document.getElementById('field-custom1').value.trim() || null,
-        customField2: document.getElementById('field-custom2').value.trim() || null,
-      }
-    }
-  };
+  const body = { settings: {
+    embedChannelId: document.getElementById('embed-channel').value.trim(),
+    embedTitle: document.getElementById('embed-title').value.trim(),
+    embedDescription: document.getElementById('embed-desc').value.trim(),
+    embedColor: document.getElementById('embed-color-text').value.trim(),
+    buttonLabel: document.getElementById('btn-label').value.trim(),
+    buttonColor: document.getElementById('btn-color').value,
+    roleToRemove: document.getElementById('role-remove').value.trim(),
+    roleToAdd: document.getElementById('role-add').value.trim(),
+    logChannelId: document.getElementById('log-channel').value.trim(),
+    formSubmitChannelId: document.getElementById('submit-channel').value.trim(),
+    watchChannelId: document.getElementById('watch-channel').value.trim(),
+    dmToTarget: document.getElementById('dm-target-enabled').checked,
+    dmToTargetMessage: document.getElementById('dm-target-msg').value.trim(),
+    dmToSubmitterOnJoin: document.getElementById('dm-submitter-enabled').checked,
+    dmToSubmitterMessage: document.getElementById('dm-submitter-msg').value.trim(),
+    formFields: {
+      reason: document.getElementById('field-reason').checked,
+      evidence: document.getElementById('field-evidence').checked,
+      deadline: document.getElementById('field-deadline').checked,
+      customField1: document.getElementById('field-custom1').value.trim()||null,
+      customField2: document.getElementById('field-custom2').value.trim()||null,
+    },
+    logFields: {
+      showSubmitter: document.getElementById('log-show-submitter').checked,
+      showTarget: document.getElementById('log-show-target').checked,
+      showReason: document.getElementById('log-show-reason').checked,
+      showEvidence: document.getElementById('log-show-evidence').checked,
+      showDeadline: document.getElementById('log-show-deadline').checked,
+      showRoleChange: document.getElementById('log-show-rolechange').checked,
+    },
+    logLabels: {
+      submitter: document.getElementById('label-submitter').value.trim()||'تنفذ بواسطة',
+      target: document.getElementById('label-target').value.trim()||'المستدعى',
+      reason: document.getElementById('label-reason').value.trim()||'السبب',
+      evidence: document.getElementById('label-evidence').value.trim()||'الدليل',
+      deadline: document.getElementById('label-deadline').value.trim()||'الموعد النهائي',
+      roleChange: document.getElementById('label-rolechange').value.trim()||'التغيير',
+    },
+  }};
 
-  const res = await fetch('/api/settings', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(body)
-  });
+  const res = await fetch('/api/settings', { method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify(body) });
   const data = await res.json();
-  showToast(res.ok ? '✅ تم الحفظ بنجاح!' : '❌ ' + data.error, res.ok);
+  showToast(res.ok?'✅ تم الحفظ بنجاح!':'❌ '+data.error, res.ok);
 }
 
 async function deployEmbed() {
-  const res = await fetch('/api/deploy-embed', {
-    method: 'POST',
-    credentials: 'include'
-  });
+  const res = await fetch('/api/deploy-embed', { method:'POST', credentials:'include' });
   const data = await res.json();
-  showToast(res.ok ? '✅ تم نشر الإمبيد!' : '❌ ' + data.error, res.ok);
+  showToast(res.ok?'✅ تم نشر الإمبيد!':'❌ '+data.error, res.ok);
 }
 
 async function loadRequests(status) {
   const tbody = document.getElementById('requests-tbody');
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted)">جاري التحميل...</td></tr>';
-  
-  const url = '/api/requests' + (status ? `?status=${status}` : '');
-  const res = await fetch(url, { credentials: 'include' });
+  tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted)">جاري التحميل...</td></tr>';
+  const url='/api/requests'+(status?`?status=${status}`:'');
+  const res = await fetch(url, {credentials:'include'});
   const data = await res.json();
-
-  if (!data.requests?.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted)">لا توجد طلبات</td></tr>';
-    return;
-  }
-
-  const badges = { pending: 'badge-pending', approved: 'badge-approved', rejected: 'badge-rejected' };
-  const statusAr = { pending: '⏳ انتظار', approved: '✅ موافق', rejected: '❌ مرفوض' };
-
-  tbody.innerHTML = data.requests.map(r => `
+  if (!data.requests?.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted)">لا توجد استدعاءات</td></tr>'; return; }
+  const badges={pending:'badge-pending',approved:'badge-approved',rejected:'badge-rejected'};
+  const statusAr={pending:'⏳ انتظار',approved:'✅ إرجاع رتبة',rejected:'❌ بدون رتبة'};
+  tbody.innerHTML=data.requests.map(r=>`
     <tr>
       <td>${r.submitterTag}</td>
       <td><code style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-size:12px">${r.targetUserId}</code></td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.reason}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.reason}</td>
+      <td style="font-size:13px;color:var(--muted)">${r.deadline||'-'}</td>
       <td><span class="badge ${badges[r.status]}">${statusAr[r.status]}</span></td>
       <td style="color:var(--muted);font-size:13px">${new Date(r.createdAt).toLocaleDateString('ar-SA')}</td>
     </tr>
   `).join('');
 }
 
-// تحقق من الجلسة عند فتح الصفحة
-(async () => {
-  const res = await fetch('/api/settings', { credentials: 'include' });
-  if (res.ok) {
-    const data = await res.json();
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'block';
-    document.getElementById('guild-name-display').textContent = data.guildName;
-    updateBotStatus(data.botActive);
-    loadStats();
-    currentSettings = data;
-    const s = data.settings;
-    document.getElementById('embed-title').value = s.embedTitle || '';
-    document.getElementById('embed-desc').value = s.embedDescription || '';
-    document.getElementById('embed-color-text').value = s.embedColor || '#5865F2';
-    document.getElementById('embed-color-picker').value = s.embedColor || '#5865F2';
-    document.getElementById('btn-label').value = s.buttonLabel || '';
-    document.getElementById('btn-color').value = s.buttonColor || 'Primary';
-    document.getElementById('embed-channel').value = s.embedChannelId || '';
-    document.getElementById('role-remove').value = s.roleToRemove || '';
-    document.getElementById('role-add').value = s.roleToAdd || '';
-    document.getElementById('submit-channel').value = s.formSubmitChannelId || '';
-    document.getElementById('log-channel').value = s.logChannelId || '';
-    document.getElementById('field-reason').checked = s.formFields?.reason !== false;
-    document.getElementById('field-evidence').checked = s.formFields?.evidence !== false;
-    document.getElementById('field-custom1').value = s.formFields?.customField1 || '';
-    document.getElementById('field-custom2').value = s.formFields?.customField2 || '';
-  }
+(async()=>{
+  const res = await fetch('/api/settings',{credentials:'include'});
+  if (res.ok) { const data=await res.json(); showDashboard(data.guildName,data.botActive); loadStats(); loadSettings(); }
 })();
 
-// Enter key for login
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && document.getElementById('login-screen').style.display !== 'none') doLogin();
-});
+document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&document.getElementById('login-screen').style.display!=='none') doLogin(); });
 </script>
 </body>
 </html>
