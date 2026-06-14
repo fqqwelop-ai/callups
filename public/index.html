@@ -130,6 +130,7 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);min
     <button class="nav-item" onclick="showPage('deadline',this)"><span class="icon">⏰</span> الموعد النهائي</button>
     <button class="nav-item" onclick="showPage('form',this)"><span class="icon">📋</span> الفورم</button>
     <button class="nav-item" onclick="showPage('log',this)"><span class="icon">📝</span> إعدادات اللوق</button>
+    <button class="nav-item" onclick="showPage('logembed',this)"><span class="icon">🎨</span> تخصيص إمبيد اللوق</button>
     <button class="nav-item" onclick="showPage('messages',this)"><span class="icon">✉️</span> الرسائل التلقائية</button>
     <button class="nav-item" onclick="showPage('requests',this)"><span class="icon">📬</span> الاستدعاءات</button>
     <div class="sidebar-bot-status">
@@ -325,6 +326,34 @@ body{font-family:'Tajawal',sans-serif;background:var(--bg);color:var(--text);min
       </div>
     </div>
 
+
+    <!-- Log Embed Customization -->
+    <div class="page" id="page-logembed">
+      <div class="page-header"><div><h1>🎨 تخصيص إمبيد اللوق</h1><p>تغيير نصوص وألوان رسالة اللوق في الديسكورد</p></div></div>
+      <div class="card">
+        <div class="card-title">🎨 شكل الإمبيد</div>
+        <div class="settings-grid">
+          <div class="form-group"><label>عنوان الإمبيد</label><input type="text" id="logembed-title" placeholder="تم تنفيذ الكول آب"></div>
+          <div class="form-group">
+            <label>لون الإمبيد</label>
+            <div class="color-input-row">
+              <input type="color" id="logembed-color-picker" value="#5865F2" oninput="document.getElementById('logembed-color-text').value=this.value">
+              <input type="text" id="logembed-color-text" placeholder="#5865F2" oninput="document.getElementById('logembed-color-picker').value=this.value">
+            </div>
+          </div>
+          <div class="form-group" style="grid-column:span 2">
+            <label>وصف الإمبيد (اختياري)</label>
+            <textarea id="logembed-description" rows="2" placeholder="اتركه فارغ إذا ما تبي وصف"></textarea>
+          </div>
+          <div class="form-group" style="grid-column:span 2">
+            <label>الفوتر (متاح: {id} = آيدي المستدعى)</label>
+            <input type="text" id="logembed-footer" placeholder="ID: {id}">
+          </div>
+        </div>
+        <div class="save-btn-row"><button class="btn btn-primary btn-sm" onclick="saveSettings()" style="width:auto">💾 حفظ</button></div>
+      </div>
+    </div>
+
     <!-- Requests -->
     <div class="page" id="page-requests">
       <div class="page-header">
@@ -441,6 +470,13 @@ async function loadSettings(){
   document.getElementById('label-deadline').value=ll.deadline||'';
   document.getElementById('label-rolechange').value=ll.roleChange||'';
   // Messages
+  // Log Embed
+  const le=s.logEmbed||{};
+  document.getElementById('logembed-title').value=le.title||'';
+  document.getElementById('logembed-color-text').value=le.color||'#5865F2';
+  document.getElementById('logembed-color-picker').value=le.color||'#5865F2';
+  document.getElementById('logembed-description').value=le.description||'';
+  document.getElementById('logembed-footer').value=le.footer||'';
   document.getElementById('dm-target-enabled').checked=s.dmToTarget!==false;
   document.getElementById('dm-target-msg').value=s.dmToTargetMessage||'';
   document.getElementById('dm-submitter-enabled').checked=s.dmToSubmitterOnJoin!==false;
@@ -465,6 +501,12 @@ async function saveSettings(){
     deadlineReminderEnabled:document.getElementById('deadline-reminder-enabled').checked,
     deadlineAdminId:document.getElementById('deadline-admin-id').value.trim(),
     deadlineReminderMsg:document.getElementById('deadline-reminder-msg').value.trim(),
+    logEmbed:{
+      title:document.getElementById('logembed-title').value.trim()||'تم تنفيذ الكول آب',
+      color:document.getElementById('logembed-color-text').value.trim()||'#5865F2',
+      description:document.getElementById('logembed-description').value.trim()||null,
+      footer:document.getElementById('logembed-footer').value.trim()||'ID: {id}',
+    },
     dmToTarget:document.getElementById('dm-target-enabled').checked,
     dmToTargetMessage:document.getElementById('dm-target-msg').value.trim(),
     dmToSubmitterOnJoin:document.getElementById('dm-submitter-enabled').checked,
