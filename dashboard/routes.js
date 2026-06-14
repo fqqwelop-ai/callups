@@ -43,6 +43,7 @@ router.put('/settings', requireAuth, async (req, res) => {
       'dmToTarget','dmToTargetMessage','dmToSubmitterOnJoin','dmToSubmitterMessage',
     ];
     fields.forEach(f => { if (s[f] !== undefined) update[`settings.${f}`] = s[f]; });
+    if (s.logEmbed) { Object.keys(s.logEmbed).forEach(k => update[`settings.logEmbed.${k}`] = s.logEmbed[k]); }
     if (s.formFields) { Object.keys(s.formFields).forEach(k => update[`settings.formFields.${k}`] = s.formFields[k]); }
     if (s.logFields) { Object.keys(s.logFields).forEach(k => update[`settings.logFields.${k}`] = s.logFields[k]); }
     if (s.logLabels) { Object.keys(s.logLabels).forEach(k => update[`settings.logLabels.${k}`] = s.logLabels[k]); }
