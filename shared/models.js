@@ -49,6 +49,12 @@ const clientSchema = new mongoose.Schema({
       deadline: { type: String, default: 'الموعد النهائي' },
       roleChange: { type: String, default: 'التغيير' },
     },
+    logEmbed: {
+      title: { type: String, default: 'تم تنفيذ الكول آب' },
+      color: { type: String, default: '#5865F2' },
+      description: { type: String, default: null },
+      footer: { type: String, default: 'ID: {id}' },
+    },
     formFields: {
       reason: { type: Boolean, default: true },
       evidence: { type: Boolean, default: true },
