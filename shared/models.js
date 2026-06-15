@@ -8,31 +8,49 @@ const clientSchema = new mongoose.Schema({
   ownerDiscordId: { type: String, default: null },
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
+
+  // الرتب المسموح لها بمشاهدة الداشبورد
+  viewerRoles: [{ type: String }],
+
   settings: {
-    embedChannelId: { type: String, default: null },
-    embedMessageId: { type: String, default: null },
-    embedTitle: { type: String, default: '📞 استدعاء' },
-    embedDescription: { type: String, default: 'اضغط الزر أدناه للاستدعاء' },
-    embedColor: { type: String, default: '#5865F2' },
-    buttonLabel: { type: String, default: '📋 تقديم استدعاء' },
-    buttonColor: { type: String, default: 'Primary' },
-    roleToRemove: { type: String, default: null },
-    roleToAdd: { type: String, default: null },
-    formSubmitChannelId: { type: String, default: null },
+    // إمبيدات متعددة
+    embeds: [{
+      embedChannelId: { type: String },
+      embedMessageId: { type: String },
+      embedTitle: { type: String, default: '📞 استدعاء' },
+      embedDescription: { type: String, default: 'اضغط الزر أدناه للاستدعاء' },
+      embedColor: { type: String, default: '#5865F2' },
+      buttonLabel: { type: String, default: '📋 تقديم استدعاء' },
+      buttonColor: { type: String, default: 'Primary' },
+    }],
+
+    // رتب متعددة تنشال وتنحط
+    rolesToRemove: [{ type: String }],
+    rolesToAdd: [{ type: String }],
+
+    // الروم
     logChannelId: { type: String, default: null },
     watchChannelId: { type: String, default: null },
+
     // الموعد النهائي
     deadlineValue: { type: Number, default: 24 },
     deadlineUnit: { type: String, default: 'hours' },
     deadlineReminderEnabled: { type: Boolean, default: true },
-    deadlineAdminId: { type: String, default: null },
     deadlineReminderMsg: { type: String, default: 'انتهى موعد كول-آب {target}! السبب: {reason}' },
-    // رسائل تلقائية
+
+    // رسائل DM
     dmToTarget: { type: Boolean, default: true },
-    dmToTargetMessage: { type: String, default: 'تم استدعاؤك في {server}. السبب: {reason}' },
+    dmToTargetMessage: { type: String, default: 'تم استدعاؤك في {server_mention}. السبب: {reason}' },
     dmToSubmitterOnJoin: { type: Boolean, default: true },
-    dmToSubmitterMessage: { type: String, default: 'دخل {target} الروم المحدد!' },
+    dmToSubmitterMessage: { type: String, default: 'دخل {target_mention} روم الانتظار!' },
+
     // إعدادات اللوق
+    logEmbed: {
+      title: { type: String, default: 'تم تنفيذ الكول آب' },
+      color: { type: String, default: '#5865F2' },
+      description: { type: String, default: null },
+      footer: { type: String, default: 'ID: {id}' },
+    },
     logFields: {
       showSubmitter: { type: Boolean, default: true },
       showTarget: { type: Boolean, default: true },
@@ -49,15 +67,12 @@ const clientSchema = new mongoose.Schema({
       deadline: { type: String, default: 'الموعد النهائي' },
       roleChange: { type: String, default: 'التغيير' },
     },
-    logEmbed: {
-      title: { type: String, default: 'تم تنفيذ الكول آب' },
-      color: { type: String, default: '#5865F2' },
-      description: { type: String, default: null },
-      footer: { type: String, default: 'ID: {id}' },
-    },
+
+    // حقول الفورم
     formFields: {
       reason: { type: Boolean, default: true },
       evidence: { type: Boolean, default: true },
+      showUserId: { type: Boolean, default: true }, // قابل للإخفاء
       customField1: { type: String, default: null },
       customField2: { type: String, default: null },
     }
@@ -77,7 +92,7 @@ const requestSchema = new mongoose.Schema({
   reminderSent: { type: Boolean, default: false },
   customField1: { type: String, default: null },
   customField2: { type: String, default: null },
-  status: { type: String, enum: ['pending','approved','rejected'], default: 'pending' },
+  status: { type: String, enum: ['pending', 'approved', 'rejected', 'cancelled'], default: 'pending' },
   reviewerId: { type: String, default: null },
   reviewerTag: { type: String, default: null },
   createdAt: { type: Date, default: Date.now },
