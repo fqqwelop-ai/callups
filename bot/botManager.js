@@ -13,6 +13,19 @@ function formatDeadline(value, unit) {
   return unit === 'days' ? `${value} يوم` : `${value} ساعة`;
 }
 
+// دعم متغيرات المنشن في الرسائل
+function parseMessage(template, vars) {
+  return template
+    .replace(/{target_mention}/g, vars.targetId ? `<@${vars.targetId}>` : vars.targetTag || '')
+    .replace(/{submitter_mention}/g, vars.submitterId ? `<@${vars.submitterId}>` : vars.submitterTag || '')
+    .replace(/{server_mention}/g, vars.guildName || '')
+    .replace(/{target}/g, vars.targetTag || '')
+    .replace(/{submitter}/g, vars.submitterTag || '')
+    .replace(/{server}/g, vars.guildName || '')
+    .replace(/{reason}/g, vars.reason || '')
+    .replace(/{deadline}/g, vars.deadline || '');
+}
+
 async function startBot(clientData) {
   const guildId = clientData.guildId;
   if (activeBots.has(guildId)) await stopBot(guildId);
@@ -32,15 +45,14 @@ async function startBot(clientData) {
     if (guild) await DBClient.findOneAndUpdate({ guildId }, { guildName: guild.name });
   });
 
-  // ===== مراقبة دخول الروم =====
+  // ===== مراقبة دخول روم الانتظار =====
   bot.on(Events.VoiceStateUpdate, async (oldState, newState) => {
     try {
       if (newState.guild.id !== guildId) return;
       const db = await DBClient.findOne({ guildId });
       if (!db?.settings?.watchChannelId) return;
-      // تحقق إن الشخص دخل الروم (مو خرج)
       if (!newState.channelId || newState.channelId !== db.settings.watchChannelId) return;
-      if (oldState.channelId === newState.channelId) return; // كان بالفعل في الروم
+      if (oldState.channelId === newState.channelId) return;
 
       const userId = newState.member.id;
       const pendingRequests = await Request.find({ guildId, targetUserId: userId, status: 'pending' });
@@ -49,13 +61,14 @@ async function startBot(clientData) {
       for (const req of pendingRequests) {
         if (!db.settings.dmToSubmitterOnJoin) continue;
         try {
-          // ✅ الإشعار يروح للمستدعي (submitter) مباشرة
           const submitter = await bot.users.fetch(req.submitterId);
-          const msg = (db.settings.dmToSubmitterMessage || 'دخل {target} الروم المحدد!')
-            .replace('{target}', newState.member.user.tag)
-            .replace('{server}', db.guildName);
+          const msg = parseMessage(db.settings.dmToSubmitterMessage || 'دخل {target_mention} روم الانتظار!', {
+            targetId: userId, targetTag: newState.member.user.tag,
+            submitterId: req.submitterId, submitterTag: req.submitterTag,
+            guildName: db.guildName,
+          });
           await submitter.send(`📢 **إشعار:** ${msg}`);
-        } catch (e) { console.error('DM submitter error:', e.message); }
+        } catch (e) { console.error('DM error:', e.message); }
       }
     } catch (err) { console.error('VoiceState error:', err.message); }
   });
@@ -65,24 +78,28 @@ async function startBot(clientData) {
       const db = await DBClient.findOne({ guildId });
       if (!db) return;
 
-      if (interaction.isButton() && interaction.customId === `callup_open_${guildId}`) {
-        await handleOpenForm(interaction, db);
+      // دعم إمبيدات متعددة
+      if (interaction.isButton()) {
+        const embeds = db.settings?.embeds || [];
+        for (let i = 0; i < embeds.length; i++) {
+          if (interaction.customId === `callup_open_${guildId}_${i}`) {
+            await handleOpenForm(interaction, db);
+            return;
+          }
+        }
+        // fallback للإمبيد القديم
+        if (interaction.customId === `callup_open_${guildId}`) {
+          await handleOpenForm(interaction, db);
+          return;
+        }
       }
-      if (interaction.isButton() && interaction.customId.startsWith(`callup_approve_`)) {
-        await handleApprove(interaction, db);
-      }
-      if (interaction.isButton() && interaction.customId.startsWith(`callup_reject_`)) {
-        await handleReject(interaction, db);
-      }
-      if (interaction.isButton() && interaction.customId.startsWith(`callup_remind_person_`)) {
-        await handleRemindPerson(interaction, db);
-      }
-      if (interaction.isButton() && interaction.customId.startsWith(`callup_remind_admin_`)) {
-        await handleRemindAdmin(interaction, db);
-      }
-      if (interaction.isModalSubmit() && interaction.customId === `callup_modal_${guildId}`) {
-        await handleModalSubmit(interaction, db);
-      }
+
+      if (interaction.isButton() && interaction.customId.startsWith(`callup_approve_`)) await handleApprove(interaction, db);
+      if (interaction.isButton() && interaction.customId.startsWith(`callup_reject_`)) await handleReject(interaction, db);
+      if (interaction.isButton() && interaction.customId.startsWith(`callup_cancel_`)) await handleCancel(interaction, db);
+      if (interaction.isButton() && interaction.customId.startsWith(`callup_remind_person_`)) await handleRemindPerson(interaction, db);
+      if (interaction.isButton() && interaction.customId.startsWith(`callup_remind_admin_`)) await handleRemindAdmin(interaction, db);
+      if (interaction.isModalSubmit() && interaction.customId.startsWith(`callup_modal_${guildId}`)) await handleModalSubmit(interaction, db);
     } catch (err) {
       console.error(`Bot error [${guildId}]:`, err.message);
       try {
@@ -108,61 +125,81 @@ async function stopBot(guildId) {
   }
 }
 
-async function deployEmbed(guildId) {
+async function deployEmbed(guildId, embedIndex = 0) {
   const bot = activeBots.get(guildId);
   if (!bot) return { success: false, error: 'البوت مو شغال' };
   const db = await DBClient.findOne({ guildId });
-  if (!db?.settings?.embedChannelId) return { success: false, error: 'ما تم تحديد الروم' };
+  const embeds = db?.settings?.embeds || [];
+  const embedConfig = embeds[embedIndex];
+  if (!embedConfig?.embedChannelId) return { success: false, error: 'ما تم تحديد الروم' };
+
   try {
     const guild = bot.guilds.cache.get(guildId);
-    const channel = guild?.channels.cache.get(db.settings.embedChannelId);
+    const channel = guild?.channels.cache.get(embedConfig.embedChannelId);
     if (!channel) return { success: false, error: 'الروم مو موجود' };
+
     const embed = new EmbedBuilder()
-      .setTitle(db.settings.embedTitle || '📞 استدعاء')
-      .setDescription(db.settings.embedDescription || 'اضغط الزر أدناه للاستدعاء')
-      .setColor(db.settings.embedColor || '#5865F2')
+      .setTitle(embedConfig.embedTitle || '📞 استدعاء')
+      .setDescription(embedConfig.embedDescription || 'اضغط الزر أدناه للاستدعاء')
+      .setColor(embedConfig.embedColor || '#5865F2')
       .setTimestamp();
-    const btnStyle = { Primary: ButtonStyle.Primary, Secondary: ButtonStyle.Secondary, Success: ButtonStyle.Success, Danger: ButtonStyle.Danger }[db.settings.buttonColor] || ButtonStyle.Primary;
+
+    const btnStyle = { Primary: ButtonStyle.Primary, Secondary: ButtonStyle.Secondary, Success: ButtonStyle.Success, Danger: ButtonStyle.Danger }[embedConfig.buttonColor] || ButtonStyle.Primary;
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`callup_open_${guildId}`).setLabel(db.settings.buttonLabel || '📋 تقديم استدعاء').setStyle(btnStyle)
+      new ButtonBuilder()
+        .setCustomId(`callup_open_${guildId}_${embedIndex}`)
+        .setLabel(embedConfig.buttonLabel || '📋 تقديم استدعاء')
+        .setStyle(btnStyle)
     );
-    if (db.settings.embedMessageId) {
-      try { const old = await channel.messages.fetch(db.settings.embedMessageId); await old.delete(); } catch {}
+
+    if (embedConfig.embedMessageId) {
+      try { const old = await channel.messages.fetch(embedConfig.embedMessageId); await old.delete(); } catch {}
     }
+
     const msg = await channel.send({ embeds: [embed], components: [row] });
-    await DBClient.findOneAndUpdate({ guildId }, { 'settings.embedMessageId': msg.id });
+    await DBClient.findOneAndUpdate({ guildId }, { [`settings.embeds.${embedIndex}.embedMessageId`]: msg.id });
     return { success: true };
   } catch (err) { return { success: false, error: err.message }; }
 }
 
 async function handleOpenForm(interaction, db) {
   const { settings, guildId } = db;
-  const modal = new ModalBuilder().setCustomId(`callup_modal_${guildId}`).setTitle('📞 تقديم استدعاء');
-  const components = [
-    new ActionRowBuilder().addComponents(
+  const modalId = `callup_modal_${guildId}_${Date.now()}`;
+  const modal = new ModalBuilder().setCustomId(modalId).setTitle('📞 تقديم استدعاء');
+
+  const components = [];
+
+  // آيدي الشخص - قابل للإخفاء
+  if (settings.formFields?.showUserId !== false) {
+    components.push(new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId('target_user_id').setLabel('كوبي آيدي الشخص المستدعى').setStyle(TextInputStyle.Short).setPlaceholder('123456789012345678').setRequired(true)
-    )
-  ];
+    ));
+  }
+
   if (settings.formFields?.reason !== false) {
     components.push(new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId('reason').setLabel(settings.logLabels?.reason || 'السبب').setStyle(TextInputStyle.Paragraph).setRequired(true)
     ));
   }
+
   if (settings.formFields?.evidence !== false) {
     components.push(new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId('evidence').setLabel(settings.logLabels?.evidence || 'الدليل (رابط)').setStyle(TextInputStyle.Short).setRequired(false)
     ));
   }
+
   if (settings.formFields?.customField1) {
     components.push(new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId('custom1').setLabel(settings.formFields.customField1).setStyle(TextInputStyle.Short).setRequired(false)
     ));
   }
+
   if (settings.formFields?.customField2) {
     components.push(new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId('custom2').setLabel(settings.formFields.customField2).setStyle(TextInputStyle.Short).setRequired(false)
     ));
   }
+
   modal.addComponents(...components.slice(0, 5));
   await interaction.showModal(modal);
 }
@@ -171,15 +208,18 @@ async function handleModalSubmit(interaction, db) {
   const { settings, guildId } = db;
   await interaction.deferReply({ ephemeral: true });
 
-  const targetUserId = interaction.fields.getTextInputValue('target_user_id')?.trim();
+  const targetUserId = interaction.fields.fields.has('target_user_id')
+    ? interaction.fields.getTextInputValue('target_user_id')?.trim()
+    : null;
+
+  if (targetUserId && !/^\d{17,20}$/.test(targetUserId)) {
+    return interaction.editReply({ content: '❌ آيدي الشخص غير صحيح!' });
+  }
+
   const reason = interaction.fields.fields.has('reason') ? interaction.fields.getTextInputValue('reason')?.trim() : '-';
   const evidence = interaction.fields.fields.has('evidence') ? interaction.fields.getTextInputValue('evidence')?.trim() : null;
   const custom1 = interaction.fields.fields.has('custom1') ? interaction.fields.getTextInputValue('custom1')?.trim() : null;
   const custom2 = interaction.fields.fields.has('custom2') ? interaction.fields.getTextInputValue('custom2')?.trim() : null;
-
-  if (!/^\d{17,20}$/.test(targetUserId)) {
-    return interaction.editReply({ content: '❌ آيدي الشخص غير صحيح!' });
-  }
 
   const deadlineVal = settings.deadlineValue || 24;
   const deadlineUnit = settings.deadlineUnit || 'hours';
@@ -187,17 +227,17 @@ async function handleModalSubmit(interaction, db) {
   const deadlineText = formatDeadline(deadlineVal, deadlineUnit);
 
   let targetMember = null;
-  let targetTag = targetUserId;
-  try {
-    targetMember = await interaction.guild.members.fetch(targetUserId);
-    targetTag = targetMember.user.tag;
-  } catch {}
+  let targetTag = targetUserId || 'غير محدد';
+  if (targetUserId) {
+    try {
+      targetMember = await interaction.guild.members.fetch(targetUserId);
+      targetTag = targetMember.user.tag;
+    } catch {}
+  }
 
   const request = new Request({
-    guildId,
-    submitterId: interaction.user.id,
-    submitterTag: interaction.user.tag,
-    targetUserId, targetTag, reason, evidence,
+    guildId, submitterId: interaction.user.id, submitterTag: interaction.user.tag,
+    targetUserId: targetUserId || 'N/A', targetTag, reason, evidence,
     deadline: deadlineText, deadlineDate,
     customField1: custom1, customField2: custom2,
   });
@@ -206,15 +246,16 @@ async function handleModalSubmit(interaction, db) {
   // DM للمستدعى
   if (settings.dmToTarget && targetMember) {
     try {
-      const dmMsg = (settings.dmToTargetMessage || 'تم استدعاؤك في {server}. السبب: {reason}')
-        .replace('{server}', db.guildName)
-        .replace('{reason}', reason)
-        .replace('{submitter}', interaction.user.tag);
-      await targetMember.send(`📢 **استدعاء:** ${dmMsg}`);
+      const msg = parseMessage(settings.dmToTargetMessage || 'تم استدعاؤك في {server_mention}. السبب: {reason}', {
+        targetId: targetUserId, targetTag,
+        submitterId: interaction.user.id, submitterTag: interaction.user.tag,
+        guildName: db.guildName, reason, deadline: deadlineText,
+      });
+      await targetMember.send(`📢 **استدعاء:** ${msg}`);
     } catch {}
   }
 
-  // ===== إرسال اللوق =====
+  // إرسال اللوق
   if (settings.logChannelId) {
     const logChannel = interaction.guild.channels.cache.get(settings.logChannelId);
     if (logChannel) {
@@ -224,27 +265,25 @@ async function handleModalSubmit(interaction, db) {
 
       const embed = new EmbedBuilder()
         .setTitle(logEmbed.title || 'تم تنفيذ الكول آب')
-        .setColor(logEmbed.color || settings.embedColor || '#5865F2')
+        .setColor(logEmbed.color || '#5865F2')
         .setTimestamp()
-        .setFooter({ text: logEmbed.footer ? logEmbed.footer.replace('{id}', targetUserId) : `ID: ${targetUserId}` });
+        .setFooter({ text: (logEmbed.footer || 'ID: {id}').replace('{id}', targetUserId || 'N/A') });
 
       if (logEmbed.description) embed.setDescription(logEmbed.description);
       if (targetMember?.user?.displayAvatarURL) embed.setThumbnail(targetMember.user.displayAvatarURL());
 
       if (logFields.showSubmitter !== false) embed.addFields({ name: labels.submitter || 'تنفذ بواسطة', value: `<@${interaction.user.id}>`, inline: true });
-      if (logFields.showTarget !== false) embed.addFields({ name: labels.target || 'المستدعى', value: `<@${targetUserId}>`, inline: true });
+      if (targetUserId && logFields.showTarget !== false) embed.addFields({ name: labels.target || 'المستدعى', value: `<@${targetUserId}>`, inline: true });
       if (logFields.showReason !== false) embed.addFields({ name: labels.reason || 'السبب', value: reason });
       if (evidence && logFields.showEvidence !== false) {
-        const evidenceText = evidence.startsWith('http') ? `[${labels.evidence || 'الدليل'}](${evidence})` : evidence;
-        embed.addFields({ name: labels.evidence || 'الدليل', value: evidenceText });
+        const ev = evidence.startsWith('http') ? `[${labels.evidence || 'الدليل'}](${evidence})` : evidence;
+        embed.addFields({ name: labels.evidence || 'الدليل', value: ev });
       }
-      if (logFields.showDeadline !== false) {
-        embed.addFields({ name: labels.deadline || 'الموعد النهائي', value: `يبدأ من الآن — ${deadlineText}` });
-      }
+      if (logFields.showDeadline !== false) embed.addFields({ name: labels.deadline || 'الموعد النهائي', value: `يبدأ من الآن — ${deadlineText}` });
       if (logFields.showRoleChange !== false) {
-        const removeRole = settings.roleToRemove ? `إزالة <@&${settings.roleToRemove}>` : '-';
-        const addRole = settings.roleToAdd ? `إضافة <@&${settings.roleToAdd}>` : '-';
-        embed.addFields({ name: labels.roleChange || 'التغيير', value: `${removeRole}\n${addRole}` });
+        const removes = (settings.rolesToRemove || []).map(r => `إزالة <@&${r}>`).join('\n') || '-';
+        const adds = (settings.rolesToAdd || []).map(r => `إضافة <@&${r}>`).join('\n') || '-';
+        embed.addFields({ name: labels.roleChange || 'التغيير', value: `${removes}\n${adds}` });
       }
       if (custom1 && settings.formFields?.customField1) embed.addFields({ name: settings.formFields.customField1, value: custom1 });
       if (custom2 && settings.formFields?.customField2) embed.addFields({ name: settings.formFields.customField2, value: custom2 });
@@ -259,18 +298,15 @@ async function handleModalSubmit(interaction, db) {
     }
   }
 
-  // تغيير الرتبة عند الاستدعاء
+  // تغيير الرتب (متعددة)
   if (targetMember) {
-    try {
-      if (settings.roleToRemove) await targetMember.roles.remove(settings.roleToRemove).catch(() => {});
-      if (settings.roleToAdd) await targetMember.roles.add(settings.roleToAdd).catch(() => {});
-    } catch {}
+    for (const r of (settings.rolesToRemove || [])) await targetMember.roles.remove(r).catch(() => {});
+    for (const r of (settings.rolesToAdd || [])) await targetMember.roles.add(r).catch(() => {});
   }
 
   await interaction.editReply({ content: '✅ تم تقديم الاستدعاء بنجاح!' });
 }
 
-// ✅ إرجاع الرتبة = يشيل رتبة الكول-آب ويرجع الرتبة الأصلية
 async function handleApprove(interaction, db) {
   const requestId = interaction.customId.replace('callup_approve_', '');
   await interaction.deferUpdate();
@@ -278,15 +314,13 @@ async function handleApprove(interaction, db) {
   if (!request) return;
   const member = await interaction.guild.members.fetch(request.targetUserId).catch(() => null);
   if (member) {
-    if (db.settings.roleToAdd) await member.roles.remove(db.settings.roleToAdd).catch(() => {});    // يشيل رتبة الكول-آب
-    if (db.settings.roleToRemove) await member.roles.add(db.settings.roleToRemove).catch(() => {}); // يرجع الرتبة الأصلية
+    for (const r of (db.settings.rolesToAdd || [])) await member.roles.remove(r).catch(() => {});
+    for (const r of (db.settings.rolesToRemove || [])) await member.roles.add(r).catch(() => {});
   }
   await Request.findByIdAndUpdate(requestId, { status: 'approved', reviewerId: interaction.user.id, reviewedAt: new Date() });
-  const row = buildDisabledRow('✅ تم إرجاع الرتبة', true);
-  await interaction.message.edit({ components: [row] });
+  await interaction.message.edit({ components: [buildDisabledRow('✅ تم إرجاع الرتبة', true)] });
 }
 
-// ✅ إرجاع بدون رتبة = يشيل رتبة الكول-آب بس (ما يرجع الرتبة الأصلية)
 async function handleReject(interaction, db) {
   const requestId = interaction.customId.replace('callup_reject_', '');
   await interaction.deferUpdate();
@@ -294,12 +328,27 @@ async function handleReject(interaction, db) {
   if (!request) return;
   const member = await interaction.guild.members.fetch(request.targetUserId).catch(() => null);
   if (member) {
-    if (db.settings.roleToAdd) await member.roles.remove(db.settings.roleToAdd).catch(() => {}); // يشيل رتبة الكول-آب بس
-    // ما يرجع roleToRemove
+    for (const r of (db.settings.rolesToAdd || [])) await member.roles.remove(r).catch(() => {});
+    // ما يرجع الرتبة الأصلية
   }
   await Request.findByIdAndUpdate(requestId, { status: 'rejected', reviewerId: interaction.user.id, reviewedAt: new Date() });
-  const row = buildDisabledRow('✅ إرجاع بدون رتبة', false);
-  await interaction.message.edit({ components: [row] });
+  await interaction.message.edit({ components: [buildDisabledRow('✅ إرجاع بدون رتبة', false)] });
+}
+
+async function handleCancel(interaction, db) {
+  const requestId = interaction.customId.replace('callup_cancel_', '');
+  await interaction.deferUpdate();
+  const request = await Request.findById(requestId);
+  if (!request) return;
+  // إرجاع الرتب كما كانت
+  const member = await interaction.guild.members.fetch(request.targetUserId).catch(() => null);
+  if (member) {
+    for (const r of (db.settings.rolesToAdd || [])) await member.roles.remove(r).catch(() => {});
+    for (const r of (db.settings.rolesToRemove || [])) await member.roles.add(r).catch(() => {});
+  }
+  await Request.findByIdAndUpdate(requestId, { status: 'cancelled', reviewerId: interaction.user.id, reviewedAt: new Date() });
+  await interaction.message.edit({ components: [buildDisabledRow('🚫 تم الإلغاء', false)] });
+  await interaction.followUp({ content: '✅ تم إلغاء الاستدعاء وإرجاع الرتب', ephemeral: true });
 }
 
 function buildDisabledRow(doneLabel, isApprove) {
@@ -325,17 +374,16 @@ async function handleRemindPerson(interaction, db) {
   }
 }
 
-// ✅ تذكير الإداري = يرسل DM للشخص اللي ضغط الزر مباشرة
 async function handleRemindAdmin(interaction, db) {
   const requestId = interaction.customId.replace('callup_remind_admin_', '');
   await interaction.deferReply({ ephemeral: true });
   const request = await Request.findById(requestId);
   try {
-    const msg = (db.settings.deadlineReminderMsg || 'تذكير: كول-آب {target} بانتظار المراجعة!')
-      .replace('{target}', `<@${request?.targetUserId}>`)
-      .replace('{reason}', request?.reason || '-')
-      .replace('{deadline}', request?.deadline || '-');
-    // يرسل للشخص اللي ضغط الزر
+    const msg = parseMessage(db.settings.deadlineReminderMsg || 'تذكير: كول-آب {target_mention} بانتظار المراجعة!', {
+      targetId: request?.targetUserId, targetTag: request?.targetTag,
+      submitterId: request?.submitterId, submitterTag: request?.submitterTag,
+      guildName: db.guildName, reason: request?.reason, deadline: request?.deadline,
+    });
     await interaction.user.send(`🔔 **تذكير إداري:** ${msg}`);
     await interaction.editReply({ content: '✅ تم إرسال التذكير لك بالخاص' });
   } catch {
@@ -343,7 +391,7 @@ async function handleRemindAdmin(interaction, db) {
   }
 }
 
-// فحص المواعيد المنتهية كل دقيقة
+// فحص المواعيد المنتهية - يرسل للمستدعي
 async function checkDeadlines() {
   try {
     const clients = await DBClient.find({ isActive: true, 'settings.deadlineReminderEnabled': true });
@@ -357,12 +405,12 @@ async function checkDeadlines() {
       });
       for (const req of expired) {
         try {
-          // إرسال للمستدعي مباشرة
           const submitter = await bot.users.fetch(req.submitterId);
-          const msg = (db.settings.deadlineReminderMsg || 'انتهى موعد كول-آب {target}! السبب: {reason}')
-            .replace('{target}', `<@${req.targetUserId}>`)
-            .replace('{reason}', req.reason)
-            .replace('{deadline}', req.deadline || '-');
+          const msg = parseMessage(db.settings.deadlineReminderMsg || 'انتهى موعد كول-آب {target_mention}! السبب: {reason}', {
+            targetId: req.targetUserId, targetTag: req.targetTag,
+            submitterId: req.submitterId, submitterTag: req.submitterTag,
+            guildName: db.guildName, reason: req.reason, deadline: req.deadline,
+          });
           await submitter.send(`⏰ **انتهى الموعد:** ${msg}`);
           await Request.findByIdAndUpdate(req._id, { reminderSent: true });
         } catch {}
